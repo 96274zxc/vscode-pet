@@ -49,6 +49,12 @@ From the public package:
 dsh plugin --profile web add vscode-pet
 ```
 
+Source install from the public repository (always available):
+
+```bash
+dsh plugin --profile web add github:96274zxc/vscode-pet
+```
+
 For the Electron desktop app, use **Plugins → Add plugin → `vscode-pet`**, or the same CLI with
 `--profile desktop` where the CLI is allowed to manage that profile.
 
