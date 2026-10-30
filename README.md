@@ -43,7 +43,7 @@ Thanks to the VS Code team and the original Blobby authors for the character and
 
 ## Install in a DSH profile
 
-From the public package:
+From the public npm package (after release):
 
 ```bash
 dsh plugin --profile web add vscode-pet
