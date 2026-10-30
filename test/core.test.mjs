@@ -210,6 +210,8 @@ test('English and Chinese catalogs stay complete and in sync', () => {
 	assert.equal(en['menu.goOnTheRun'], 'Go on the Run')
 	assert.equal(en['menu.playJump'], 'Play Jump Game')
 	assert.equal(en['menu.changeColor'], 'Change Color')
+	assert.equal(en['achievement.blobby.title'], 'Color Customization')
+	assert.equal(zh['achievement.blobby.title'], '颜色自定义')
 })
 
 test('locale fallback follows the host language before DSH t is ready', () => {

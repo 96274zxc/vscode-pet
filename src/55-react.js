@@ -172,7 +172,7 @@ function HatsPanel(props) {
 		.filter(achievement => achievement.accessory)
 		.map(achievement => getChatPetAccessoryById(achievement.accessory))
 		.filter(Boolean)
-	// VS Code counts the 13 hats plus the True Name color item as 14 entries;
+	// VS Code counts the 13 hats plus the Color Customization item as 14 entries;
 	// the extra "No Hat" card is a DSH-only option and is not counted.
 	const unlockedCount = CHAT_PET_ACHIEVEMENTS.length
 	const select = accessoryId => controller.selectAccessory(accessoryId)

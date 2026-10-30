@@ -36,12 +36,12 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   and its respawn drop is capped above the composer instead of falling from the top of the chat.
 - Right-click for **Hats**, **Play Jump Game**, **Go on the Run / Come Back**,
   **Grow / Shrink / Reset Size** and **Change Color**.
-- 13 hats from the official catalog plus the **True Name** custom-color entry, laid out with the
+- 13 hats from the official catalog plus the **Color Customization** custom-color entry, laid out with the
   DSH-only **No Hat** option as a 3-column, 15-card grid. The counter keeps VS Code's "14 of 14
-  unlocked" wording; only the 13 hats and True Name are counted. The DSH port does not track
+  unlocked" wording; only the 13 hats and Color Customization are counted. The DSH port does not track
   achievements, so every hat is unlocked by default and the initial look is **Insiders + Cowboy
-  Hat**; unlock hints, rewards and "new" badges are not shown. `/blobby` still unlocks **True
-  Name** for the solid and custom colors.
+  Hat**; unlock hints, rewards and "new" badges are not shown. `/blobby` still unlocks **Color
+  Customization** for the solid and custom colors.
 - Click reactions include a rare (~1%) **yapping** fall: Blobby tips over and opens its mouth; the
   light gap is the official sprite's open mouth, not missing artwork.
 - Stable/Insiders colors plus the eight official solid presets and a custom hex color (unlocked by
@@ -102,7 +102,7 @@ Assets are embedded as PNG data URLs so the plugin works under both `http://` an
 | Right-click / `Shift+F10` / ContextMenu | Context menu |
 | Drag | Move Blobby; release with speed to throw |
 | Bounce while falling / Enter / Space | Bounce |
-| `/blobby` | Unlock True Name and open the color tab |
+| `/blobby` | Unlock Color Customization and open the color tab |
 | `/vscode-pet` | Show/hide Blobby (keeps the plugin installed) |
 
 ## Source and license
@@ -116,7 +116,7 @@ paths. The plugin code is MIT licensed (see `LICENSE`).
 
 The plugin was exercised in a temporary DSH web profile with headless Chrome: idle/typing/thinking/
 clapping/sleep/reactions, drag and throw, despawn/respawn, the context menu, both customization
-tabs, hat and color selection, True Name unlock, and the jump game. `docs/states.png` is the
+tabs, hat and color selection, Color Customization unlock, and the jump game. `docs/states.png` is the
 state matrix and `docs/hats.png` / `docs/color.png` are the customization panels from that
 run.
 

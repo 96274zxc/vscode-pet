@@ -16,7 +16,7 @@ const CHAT_PET_LOCALE_NS = 'blobby'
 const CHAT_PET_LOCALE = {
 	en: {
 		'command.blobby': 'Customize Blobby',
-		'command.blobby.description': "Unlock Blobby's true name, solid colors, and custom colors.",
+		'command.blobby.description': "Unlock Blobby's color customization, solid colors, and custom colors.",
 		'command.toggle.show': 'Show Blobby',
 		'command.toggle.hide': 'Hide Blobby',
 		'command.toggle.description': 'Show or hide the Blobby pet on the composer.',
@@ -77,8 +77,8 @@ const CHAT_PET_LOCALE = {
 		'color.selected': 'Selected',
 		'color.locked': 'Locked',
 		'color.selectedLabel': '{0}, selected',
-		'color.lockedLabel': '{0}, locked. Discover Blobby True Name to unlock.',
-		'color.unlockHint': "Discover Blobby's True Name to unlock solid colors and custom colors. (/blobby)",
+		'color.lockedLabel': '{0}, locked. Unlock Blobby\'s Color Customization to use it.',
+		'color.unlockHint': "Unlock Blobby's Color Customization to use solid colors and custom colors. (/blobby)",
 		'color.custom': 'Custom color',
 		'color.customDescription': 'Choose any color or enter a hex value. Apply it when it feels right.',
 		'color.chooseCustom': "Choose Blobby's custom color",
@@ -121,7 +121,7 @@ const CHAT_PET_LOCALE = {
 		'achievement.chatReferenceOpened.title': 'Follow the Trail',
 		'achievement.usefulOutputCopied.title': 'Copy That',
 		'achievement.autopilotEnabled.title': 'Party Mode',
-		'achievement.blobby.title': 'True Name',
+		'achievement.blobby.title': 'Color Customization',
 		'jump.title': "Blobby's Jump Game",
 		'jump.hops': 'Hops: {0}',
 		'jump.highScore': 'High score: {0}',
@@ -136,7 +136,7 @@ const CHAT_PET_LOCALE = {
 	},
 	zh: {
 		'command.blobby': '自定义 Blobby',
-		'command.blobby.description': '解锁 Blobby 的真名、纯色与自定义颜色。',
+		'command.blobby.description': '解锁 Blobby 的颜色自定义、纯色与自定义颜色。',
 		'command.toggle.show': '显示 Blobby',
 		'command.toggle.hide': '隐藏 Blobby',
 		'command.toggle.description': '显示或隐藏输入框上方的 Blobby 宠物。',
@@ -197,8 +197,8 @@ const CHAT_PET_LOCALE = {
 		'color.selected': '已选中',
 		'color.locked': '未解锁',
 		'color.selectedLabel': '{0}，已选中',
-		'color.lockedLabel': '{0}，未解锁。发现 Blobby 的真名后解锁。',
-		'color.unlockHint': '发现 Blobby 的真名后解锁纯色和自定义颜色。(/blobby)',
+		'color.lockedLabel': '{0}，未解锁。解锁 Blobby 的颜色自定义后可使用。',
+		'color.unlockHint': '解锁 Blobby 的颜色自定义后即可使用纯色与自定义颜色。(/blobby)',
 		'color.custom': '自定义颜色',
 		'color.customDescription': '选择任意颜色或输入十六进制值，确认后再应用。',
 		'color.chooseCustom': '选择 Blobby 的自定义颜色',
@@ -241,7 +241,7 @@ const CHAT_PET_LOCALE = {
 		'achievement.chatReferenceOpened.title': '顺藤摸瓜',
 		'achievement.usefulOutputCopied.title': '收到',
 		'achievement.autopilotEnabled.title': '派对模式',
-		'achievement.blobby.title': '真名',
+		'achievement.blobby.title': '颜色自定义',
 		'jump.title': 'Blobby 跳跳乐',
 		'jump.hops': '弹跳：{0}',
 		'jump.highScore': '最高分：{0}',
@@ -452,7 +452,7 @@ const CHAT_PET_ACHIEVEMENTS = [
 	{ id: 'chatReferenceOpened', title: 'Follow the Trail', accessory: 'strawHat' },
 	{ id: 'usefulOutputCopied', title: 'Copy That', accessory: 'pinkPartyHat' },
 	{ id: 'autopilotEnabled', title: 'Party Mode', accessory: 'wizardHat' },
-	{ id: 'blobby', title: 'True Name', accessory: null, colorCustomization: true },
+	{ id: 'blobby', title: 'Color Customization', accessory: null, colorCustomization: true },
 ]
 
 const CHAT_PET_UNLOCKED_BY_DEFAULT = CHAT_PET_ACHIEVEMENTS
@@ -3532,7 +3532,7 @@ function HatsPanel(props) {
 		.filter(achievement => achievement.accessory)
 		.map(achievement => getChatPetAccessoryById(achievement.accessory))
 		.filter(Boolean)
-	// VS Code counts the 13 hats plus the True Name color item as 14 entries;
+	// VS Code counts the 13 hats plus the Color Customization item as 14 entries;
 	// the extra "No Hat" card is a DSH-only option and is not counted.
 	const unlockedCount = CHAT_PET_ACHIEVEMENTS.length
 	const select = accessoryId => controller.selectAccessory(accessoryId)

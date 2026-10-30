@@ -165,7 +165,7 @@ const CHAT_PET_ACHIEVEMENTS = [
 	{ id: 'chatReferenceOpened', title: 'Follow the Trail', accessory: 'strawHat' },
 	{ id: 'usefulOutputCopied', title: 'Copy That', accessory: 'pinkPartyHat' },
 	{ id: 'autopilotEnabled', title: 'Party Mode', accessory: 'wizardHat' },
-	{ id: 'blobby', title: 'True Name', accessory: null, colorCustomization: true },
+	{ id: 'blobby', title: 'Color Customization', accessory: null, colorCustomization: true },
 ]
 
 const CHAT_PET_UNLOCKED_BY_DEFAULT = CHAT_PET_ACHIEVEMENTS
