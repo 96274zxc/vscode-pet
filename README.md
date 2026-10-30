@@ -34,11 +34,12 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   the despawn/respawn portal sequence. The composer card is its only perch: it spawns and respawns
   above that card, follows it when the window or input grows/shrinks, bounces off the side walls,
   and its respawn drop is capped above the composer instead of falling from the top of the chat.
-- Right-click for **Achievements**, **Play Jump Game**, **Go on the Run / Come Back**,
+- Right-click for **Hats**, **Play Jump Game**, **Go on the Run / Come Back**,
   **Grow / Shrink / Reset Size** and **Change Color**.
-- 14 achievements and 13 hats from the official catalog. Event-driven achievement tracking is
-  intentionally not implemented: 13 achievements are unlocked by default and **True Name** is
-  unlocked by `/blobby`, which opens the color tab.
+- 13 hats from the official catalog. The DSH port does not track achievements, so every hat is
+  unlocked by default and the initial look is **Insiders + Cowboy Hat**. The old achievement panel
+  is now a hat picker; unlock hints, rewards and "new" badges are not shown. `/blobby` still unlocks
+  **True Name** for the solid and custom colors.
 - Stable/Insiders colors plus the eight official solid presets and a custom hex color (unlocked by
   `/blobby`). Hats and colors are applied immediately and persist.
 - Blobby's jump game: Space to charge, release to jump, Left/Right to aim or hop, Escape to exit,
@@ -91,7 +92,7 @@ Assets are embedded as PNG data URLs so the plugin works under both `http://` an
 
 | Input | Action |
 | --- | --- |
-| Click / Enter / Space | Random reaction; wakes Blobby; opens achievements while the star is visible |
+| Click / Enter / Space | Random reaction; wakes Blobby; opens the hats panel while the star is visible |
 | `←` / `→` | Hop along the composer |
 | `Shift+←` / `Shift+→` | Throw toward a wall |
 | Right-click / `Shift+F10` / ContextMenu | Context menu |
@@ -112,7 +113,7 @@ paths. The plugin code is MIT licensed (see `LICENSE`).
 The plugin was exercised in a temporary DSH web profile with headless Chrome: idle/typing/thinking/
 clapping/sleep/reactions, drag and throw, despawn/respawn, the context menu, both customization
 tabs, hat and color selection, True Name unlock, and the jump game. `docs/states.png` is the
-state matrix and `docs/achievements.png` / `docs/color.png` are the customization panels from that
+state matrix and `docs/hats.png` / `docs/color.png` are the customization panels from that
 run.
 
 It was then verified in the real Electron desktop profile (not headless): composer-card landings,

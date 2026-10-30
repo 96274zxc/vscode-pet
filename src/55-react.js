@@ -1,4 +1,4 @@
-/* React shell: dock anchor, portal layer, context menu, achievements and color panels. */
+/* React shell: dock anchor, portal layer, context menu, hats and color panels. */
 
 let activeBlobbyController = null
 
@@ -118,7 +118,7 @@ function ChatPetMenu(props) {
 		style: { left: `${left}px`, top: `${top}px` },
 		onContextMenu: event => event.preventDefault(),
 	}, [
-		item('achievements', t('menu.achievements'), true, () => controller.host.openPanel('achievements')),
+		item('hats', t('menu.hats'), true, () => controller.host.openPanel('hats')),
 		item('jump', t('menu.playJump'), jumpEnabled, () => controller.startJumpGame()),
 		item('run', controller.onTheRun ? t('menu.comeBack') : t('menu.goOnTheRun'), true, () => controller.setOnTheRun(!controller.onTheRun)),
 		h('div', { key: 'sep1', className: 'chat-pet-menu-separator' }),
@@ -130,52 +130,34 @@ function ChatPetMenu(props) {
 	])
 }
 
-function AchievementsPanel(props) {
-	const { controller, onClose, t } = props
+function HatsPanel(props) {
+	const { controller, t } = props
 	const prefs = useBlobbyPrefs()
-	const unlocked = getChatPetUnlockedIds()
-	const unlockedSet = new Set(unlocked)
 	const variant = getChatPetColorVariant(prefs.color)
-	const select = (achievement) => {
-		if (!unlockedSet.has(achievement.id)) return
-		chatPetPrefs.set({ achievementSeen: [...new Set([...prefs.achievementSeen, achievement.id])] })
-		if (achievement.colorCustomization) {
-			props.onTab('color')
-			return
-		}
-		controller.selectAccessory(achievement.accessory ?? null)
-	}
-	const card = (achievement) => {
-		const isUnlocked = unlockedSet.has(achievement.id)
-		const accessory = achievement.accessory ? getChatPetAccessoryById(achievement.accessory) : undefined
-		const wearing = isUnlocked && prefs.accessory === (accessory?.id ?? null) && accessory !== undefined
-		const stateLabel = achievement.colorCustomization
-			? t('achievements.changeColor')
-			: wearing ? t('achievements.wearing') : t('achievements.select')
-		const reward = accessory ? t(accessory.key) : t('color.custom')
-		const isNew = prefs.achievementSeen.indexOf(achievement.id) < 0 && isUnlocked
-		return h('li', { key: achievement.id, className: 'chat-pet-achievements-list-item' }, [
+	const hats = CHAT_PET_ACHIEVEMENTS
+		.filter(achievement => achievement.accessory)
+		.map(achievement => getChatPetAccessoryById(achievement.accessory))
+		.filter(Boolean)
+	const select = accessoryId => controller.selectAccessory(accessoryId)
+	const card = accessory => {
+		const wearing = prefs.accessory === accessory.id
+		const stateLabel = wearing ? t('achievements.wearing') : t('achievements.select')
+		return h('li', { key: accessory.id, className: 'chat-pet-achievements-list-item' }, [
 			h('button', {
 				type: 'button',
-				className: `chat-pet-achievement-card ${isUnlocked ? '' : 'locked'} ${wearing ? 'wearing' : ''}`,
-				disabled: !isUnlocked,
-				onClick: () => select(achievement),
-				'aria-label': isUnlocked
-					? t('achievements.cardAria', t(`achievement.${achievement.id}.title`), reward, stateLabel)
-					: t('achievements.lockedAria', t(`achievement.${achievement.id}.hint`), reward),
+				className: `chat-pet-achievement-card ${wearing ? 'wearing' : ''}`,
+				onClick: () => select(accessory.id),
+				'aria-label': t('achievements.cardAria', t(accessory.key), stateLabel),
 			}, [
 				h('div', { key: 'preview', className: 'chat-pet-achievement-previews' }, h(ChatPetPreview, {
-					accessoryId: achievement.accessory,
-					unlocked: isUnlocked,
+					accessoryId: accessory.id,
+					unlocked: true,
 					color: prefs.color,
 					variant,
 				})),
 				h('div', { key: 'content', className: 'chat-pet-achievement-card-content' }, [
-					isNew ? h('span', { key: 'new', className: 'chat-pet-achievement-new-badge' }, t('achievements.new')) : null,
-					h('h3', { key: 'title' }, isUnlocked ? t(`achievement.${achievement.id}.title`) : t('achievements.locked')),
-					h('span', { key: 'state', className: 'chat-pet-achievement-state' }, isUnlocked ? stateLabel : t('achievements.hint')),
-					h('p', { key: 'desc', className: 'chat-pet-achievement-description' }, isUnlocked ? t(`achievement.${achievement.id}.description`) : t(`achievement.${achievement.id}.hint`)),
-					h('p', { key: 'reward', className: 'chat-pet-achievement-reward' }, t('achievements.rewards', reward)),
+					h('h3', { key: 'title' }, t(accessory.key)),
+					h('span', { key: 'state', className: 'chat-pet-achievement-state' }, stateLabel),
 				]),
 			]),
 		])
@@ -187,11 +169,11 @@ function AchievementsPanel(props) {
 		h('section', {
 			key: 'collection',
 			className: 'chat-pet-achievements-collection',
-			'aria-label': t('achievements.collectionAria', unlocked.length, CHAT_PET_ACHIEVEMENTS.length),
+			'aria-label': t('achievements.collectionAria', hats.length),
 		}, [
 			h('div', { key: 'header', className: 'chat-pet-achievements-collection-header' }, [
 				h('h2', { key: 'h2' }, t('achievements.collection')),
-				h('span', { key: 'count', className: 'chat-pet-achievements-count' }, t('achievements.count', unlocked.length, CHAT_PET_ACHIEVEMENTS.length)),
+				h('span', { key: 'count', className: 'chat-pet-achievements-count' }, t('achievements.count', hats.length)),
 			]),
 			h('ul', { key: 'list', className: 'chat-pet-achievements-list' }, [
 				h('li', { key: 'none', className: 'chat-pet-achievements-list-item' }, h('button', {
@@ -206,18 +188,10 @@ function AchievementsPanel(props) {
 						h('span', { key: 'state', className: 'chat-pet-achievement-state' }, noHatWearing ? t('achievements.wearing') : t('achievements.select')),
 					]),
 				])),
-				...CHAT_PET_ACHIEVEMENTS.map(card),
-				h('li', { key: 'roadmap', className: 'chat-pet-achievements-list-item' }, h('article', { className: 'chat-pet-achievement-card chat-pet-achievement-roadmap' }, [
-					h('div', { key: 'preview', className: 'chat-pet-achievement-roadmap-preview' }, 'TBD'),
-					h('div', { key: 'content', className: 'chat-pet-achievement-card-content' }, [
-						h('h3', { key: 'title' }, t('achievements.roadmap.title')),
-						h('span', { key: 'state', className: 'chat-pet-achievement-state' }, t('achievements.roadmap.state')),
-						h('p', { key: 'intro', className: 'chat-pet-achievement-description' }, t('achievements.roadmap.intro')),
-					]),
-				])),
+				...hats.map(card),
 			]),
 		]),
-		h('p', { key: 'experimental', className: 'chat-pet-achievements-experimental' }, t('achievements.experimental')),
+		h('p', { key: 'note', className: 'chat-pet-hats-note' }, t('hats.note')),
 	])
 }
 
@@ -356,14 +330,14 @@ function ChatPetPanel(props) {
 	}, [
 		h('div', { key: 'head', className: 'chat-pet-panel-head' }, [
 			h('div', { key: 'tabs', className: 'chat-pet-panel-tabs', role: 'tablist' }, [
-				h('button', { key: 'achievements', type: 'button', role: 'tab', className: 'chat-pet-panel-tab', 'aria-selected': tab === 'achievements' ? 'true' : 'false', onClick: () => onTab('achievements') }, t('panel.tab.achievements')),
+				h('button', { key: 'hats', type: 'button', role: 'tab', className: 'chat-pet-panel-tab', 'aria-selected': tab === 'hats' ? 'true' : 'false', onClick: () => onTab('hats') }, t('panel.tab.hats')),
 				h('button', { key: 'color', type: 'button', role: 'tab', className: 'chat-pet-panel-tab', 'aria-selected': tab === 'color' ? 'true' : 'false', onClick: () => onTab('color') }, t('panel.tab.color')),
 			]),
 			h('button', { key: 'close', type: 'button', className: 'chat-pet-panel-close', 'aria-label': t('panel.close'), onClick: onClose }, '×'),
 		]),
 		h('div', { key: 'body', className: 'chat-pet-panel-body' }, tab === 'color'
 			? h(ColorPanel, { controller, t })
-			: h(AchievementsPanel, { controller, onClose, onTab, t })),
+			: h(HatsPanel, { controller, t })),
 	]))
 }
 
@@ -371,7 +345,7 @@ function PetSlot(props) {
 	const tRef = React.useRef(props.t)
 	tRef.current = props.t
 	const [target, setTarget] = React.useState(null)
-	const [ui, setUi] = React.useState({ menu: null, panel: null, tab: 'achievements' })
+	const [ui, setUi] = React.useState({ menu: null, panel: null, tab: 'hats' })
 	const anchorRef = React.useRef(null)
 	const mountRef = React.useRef(null)
 	const controllerRef = React.useRef(null)
@@ -422,7 +396,7 @@ function PetSlot(props) {
 				getT: () => tRef.current,
 				getGeometry,
 				status: text => statusNode.current && (statusNode.current.textContent = text, clearTimeout(statusTimer.current), statusTimer.current = setTimeout(() => { if (statusNode.current) statusNode.current.textContent = '' }, 1200)),
-				openPanel: tab => setUi(current => ({ ...current, menu: null, panel: tab ?? 'achievements', tab: tab ?? 'achievements' })),
+				openPanel: tab => setUi(current => ({ ...current, menu: null, panel: tab ?? 'hats', tab: tab ?? 'hats' })),
 				openMenu: menu => setUi(current => ({ ...current, menu, panel: null })),
 				closeUi: () => setUi(current => ({ ...current, menu: null, panel: null })),
 				canPlayJumpGame: () => false,

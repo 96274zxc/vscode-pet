@@ -152,20 +152,20 @@ const CHAT_PET_ACCESSORIES = {
 }
 
 const CHAT_PET_ACHIEVEMENTS = [
-	{ id: 'requestRevision', title: 'Second Draft', description: 'You edited and resent an earlier chat request.', hint: 'An earlier request may deserve a second pass.', accessory: 'grandTopHatMonocle' },
-	{ id: 'firstChatMessage', title: 'Welcome to the Wild West', description: 'You sent your first chat message.', hint: 'Every collection starts with a first conversation.', accessory: 'cowboyHat' },
-	{ id: 'integratedBrowserShared', title: 'Shared Perspective', description: 'You shared the integrated browser with the agent.', hint: 'Let the agent see what you see in the integrated browser.', accessory: 'baseballCap' },
-	{ id: 'modelSwitch', title: 'Model Citizen', description: 'You selected a different model from the model picker.', hint: 'A different model can offer a different perspective.', accessory: 'constructionHardHat' },
-	{ id: 'mcpServerPresent', title: 'Server Wrangler', description: 'You configured an MCP server.', hint: 'Connect Chat to a server beyond the editor.', accessory: 'firefighterHelmet' },
-	{ id: 'customSkillPresent', title: 'Skilled Builder', description: 'You added a custom skill.', hint: 'Teach Chat a skill of your own.', accessory: 'crown' },
-	{ id: 'agentsWindowOpened', title: 'Mission Control', description: 'You opened the Agents window.', hint: 'Some agent work belongs in its own window.', accessory: 'propellerHat' },
-	{ id: 'createPullRequest', title: 'Ship it', description: 'You used Create PR in the Agents window.', hint: 'When the changes are ready, send them on their way.', accessory: 'darkSailorHat' },
-	{ id: 'agentEditKept', title: 'Let it cook', description: 'You kept a change prepared by Chat.', hint: 'Give a good idea time to come together.', accessory: 'whiteChefHat' },
-	{ id: 'agentChangesReviewed', title: 'Trust but Verify', description: 'You opened agent changes for review.', hint: 'Take a closer look before keeping the changes.', accessory: 'bambooHat' },
-	{ id: 'chatReferenceOpened', title: 'Follow the Trail', description: 'You opened a file or code reference from Chat.', hint: 'Useful answers often point somewhere worth exploring.', accessory: 'strawHat' },
-	{ id: 'usefulOutputCopied', title: 'Copy That', description: 'You copied useful output from Chat.', hint: 'Keep something useful from a chat response.', accessory: 'pinkPartyHat' },
-	{ id: 'autopilotEnabled', title: 'Party Mode', description: 'You switched an agent session from Interactive to Autopilot.', hint: 'Some work is ready to carry on with less steering.', accessory: 'wizardHat' },
-	{ id: 'blobby', title: 'True Name', description: 'Blob the Builder? Blobby McBlobface? Nope, my name is Blobby.', hint: 'This little blob has a name. Try calling it in Chat.', accessory: null, colorCustomization: true },
+	{ id: 'requestRevision', title: 'Second Draft', accessory: 'grandTopHatMonocle' },
+	{ id: 'firstChatMessage', title: 'Welcome to the Wild West', accessory: 'cowboyHat' },
+	{ id: 'integratedBrowserShared', title: 'Shared Perspective', accessory: 'baseballCap' },
+	{ id: 'modelSwitch', title: 'Model Citizen', accessory: 'constructionHardHat' },
+	{ id: 'mcpServerPresent', title: 'Server Wrangler', accessory: 'firefighterHelmet' },
+	{ id: 'customSkillPresent', title: 'Skilled Builder', accessory: 'crown' },
+	{ id: 'agentsWindowOpened', title: 'Mission Control', accessory: 'propellerHat' },
+	{ id: 'createPullRequest', title: 'Ship it', accessory: 'darkSailorHat' },
+	{ id: 'agentEditKept', title: 'Let it cook', accessory: 'whiteChefHat' },
+	{ id: 'agentChangesReviewed', title: 'Trust but Verify', accessory: 'bambooHat' },
+	{ id: 'chatReferenceOpened', title: 'Follow the Trail', accessory: 'strawHat' },
+	{ id: 'usefulOutputCopied', title: 'Copy That', accessory: 'pinkPartyHat' },
+	{ id: 'autopilotEnabled', title: 'Party Mode', accessory: 'wizardHat' },
+	{ id: 'blobby', title: 'True Name', accessory: null, colorCustomization: true },
 ]
 
 const CHAT_PET_UNLOCKED_BY_DEFAULT = CHAT_PET_ACHIEVEMENTS
@@ -209,10 +209,10 @@ const CHAT_PET_JUMP_HIGH_SCORE_KEY = 'dsh.vscode-pet.jumpHighScore'
 const CHAT_PET_DEBUG_KEY = 'dsh.vscode-pet.debug'
 
 const CHAT_PET_DEFAULT_PREFS = {
-	v: 1,
+	v: 2,
 	visible: true,
 	color: 'insiders',
-	accessory: null,
+	accessory: 'cowboyHat',
 	scale: 1,
 	horizontal: { edge: 'right', inset: CHAT_PET_DEFAULT_RIGHT_INSET },
 	onTheRun: false,

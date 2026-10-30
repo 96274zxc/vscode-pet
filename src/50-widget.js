@@ -1010,7 +1010,7 @@ class ChatPetController {
 		if (this.transientState === 'achievementUnlocked') {
 			clearTimeout(this.transientTimer)
 			this.transientState = undefined
-			this.host.openPanel('achievements')
+			this.host.openPanel('hats')
 			return
 		}
 		const wasSleeping = this.idleExpired || this.renderedState === 'sleep'

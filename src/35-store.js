@@ -3,7 +3,17 @@
 function normalizeChatPetPrefs(raw) {
 	const source = raw && typeof raw === 'object' ? raw : {}
 	const color = parseChatPetColor(source.color) ?? CHAT_PET_DEFAULT_PREFS.color
-	const accessory = typeof source.accessory === 'string' && getChatPetAccessoryById(source.accessory) ? source.accessory : null
+	// v1 shipped with no hat by default. A missing accessory (or a v1 null)
+	// therefore migrates to the new default; an explicit null in v2+ means the
+	// user chose "No Hat" and is preserved.
+	let accessory
+	if (source.accessory === undefined) {
+		accessory = CHAT_PET_DEFAULT_PREFS.accessory
+	} else if (source.accessory === null && (Number.isFinite(source.v) ? source.v : 1) < CHAT_PET_DEFAULT_PREFS.v) {
+		accessory = CHAT_PET_DEFAULT_PREFS.accessory
+	} else {
+		accessory = typeof source.accessory === 'string' && getChatPetAccessoryById(source.accessory) ? source.accessory : null
+	}
 	const scale = Number.isFinite(source.scale) ? Math.max(CHAT_PET_MIN_SCALE, source.scale) : 1
 	let horizontal = CHAT_PET_DEFAULT_PREFS.horizontal
 	if (source.horizontal && typeof source.horizontal === 'object') {
@@ -16,7 +26,7 @@ function normalizeChatPetPrefs(raw) {
 		: []
 	const jumpHighScore = Number.isSafeInteger(source.jumpHighScore) && source.jumpHighScore >= 0 ? source.jumpHighScore : 0
 	return {
-		v: 1,
+		v: CHAT_PET_DEFAULT_PREFS.v,
 		visible: source.visible !== false,
 		color,
 		accessory,
