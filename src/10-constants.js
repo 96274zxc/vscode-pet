@@ -31,6 +31,10 @@ const DIZZY_DIRECTION_CHANGE_COUNT = 8
 const DIZZY_DIRECTION_CHANGE_MAX_INTERVAL = 600
 const RESPAWN_EFFECT_DURATION = 800
 const RESPAWN_EFFECT_REDUCED_MOTION_DURATION = 400
+// VS Code drops the pet from the top of its chat widget, which is only a few
+// hundred pixels tall. DSH's conversation region is nearly the whole window, so
+// cap the respawn drop above the composer to keep the same visual pace.
+const CHAT_PET_RESPAWN_DROP = 360
 const DRAG_THRESHOLD = 2
 const HOP_DISTANCE = 24
 const HOP_APEX_DELAY = 300

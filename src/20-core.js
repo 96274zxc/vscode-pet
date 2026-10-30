@@ -371,6 +371,10 @@ function getChatPetPlatformTop(hostTop, inputTop, substantiveSurfaceTop) {
 	return hostTop + getChatPetVerticalOffset(hostTop, inputTop)
 }
 
+function getChatPetRespawnTop(chatTop, inputTop, drop = CHAT_PET_RESPAWN_DROP) {
+	return Math.max(chatTop, inputTop - Math.max(0, drop))
+}
+
 function getChatPetRelativeHorizontalPositionSafe(left, minimumLeft, maximumLeft) {
 	return getChatPetRelativeHorizontalPosition(left, minimumLeft, maximumLeft)
 }

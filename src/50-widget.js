@@ -67,6 +67,9 @@ class ChatPetController {
 		this._hopDirection = 'right'
 		this._uiOpen = false
 		this._lastFacing = 'right'
+		this._customPosition = false
+		this._horizontalAnchor = undefined
+		this._layoutScheduled = false
 		this._directionChanges = new ChatPetDirectionChangeController()
 		this._facing = new ChatPetFacingController()
 		this._blink = new ChatPetBlinkController(blinking => this._updateBlink(blinking))
@@ -229,6 +232,16 @@ class ChatPetController {
 		on(window, 'scroll', () => this._updateWideLayers(), true)
 		on(document, 'visibilitychange', () => this._onVisibilityChange())
 		this._resizeObserver = new ResizeObserver(() => this.layout())
+		this._mutationObserver = new MutationObserver(() => {
+			if (this.disposed || this._layoutScheduled) return
+			if (this.inputElement && this.inputElement.isConnected) return
+			this._layoutScheduled = true
+			requestAnimationFrame(() => {
+				this._layoutScheduled = false
+				if (this.disposed) return
+				if (!this.inputElement || !this.inputElement.isConnected) this.layout()
+			})
+		})
 	}
 
 	_observeMotion() {
@@ -275,60 +288,110 @@ class ChatPetController {
 			this.root.style.display = 'none'
 			return
 		}
-		this.root.style.display = ''
 		const seatElement = geometry.seat
 		const chatElement = geometry.chat
+		const inputElement = geometry.input && geometry.input.isConnected ? geometry.input : seatElement
 		const seat = seatElement.getBoundingClientRect()
 		const chat = chatElement.getBoundingClientRect()
+		const input = inputElement.getBoundingClientRect()
+		if (input.width <= 0 || input.height <= 0) {
+			this.root.style.display = 'none'
+			return
+		}
+		this.root.style.display = ''
 		this.seatRect = seat
 		this.chatRect = chat
-		this._syncObserver(seatElement, chatElement)
+		this.inputRect = input
+		this.inputElement = inputElement
+		this._syncObserver(seatElement, chatElement, inputElement)
 		this.displaySize = CHAT_PET_DISPLAY_SIZE * this.scale
 		this.button.style.width = `${this.displaySize}px`
 		this.button.style.height = `${this.displaySize}px`
 		this.visual.style.width = `${CHAT_PET_DISPLAY_SIZE}px`
 		this.visual.style.height = `${CHAT_PET_DISPLAY_SIZE}px`
 		this.visual.style.transform = `scale(${this.scale})`
-		if (!this._customPosition || this.dead || this.onTheRun) {
-			const minimumLeft = seat.left
-			const maximumLeft = Math.max(minimumLeft, seat.right - this.displaySize)
-			const restored = getChatPetRestoredHorizontalPosition(this.prefs.horizontal, minimumLeft, maximumLeft)
-			this._left = this.airborne ? this._left : restored
-			this._top = this._restingTop()
-			if (!this.airborne && !this.dead) setButtonPosition(this.button, this._left, this._top)
-		}
 		this._updateWideLayers()
 		this._updateBounceCounterPosition()
-		if (this.airborne && this._throw) this._refreshThrowBounds()
+		if (this.dead) {
+			this._updateRespawnEffectPosition()
+			return
+		}
+		if (this.airborne && this._throw) {
+			this._refreshThrowBounds()
+			return
+		}
+		if (this._jumpGame) return
+		const minimumLeft = input.left
+		const maximumLeft = Math.max(minimumLeft, input.right - this.displaySize)
+		let left
+		if (!this._customPosition || this.onTheRun) {
+			left = getChatPetRestoredHorizontalPosition(this.prefs.horizontal, minimumLeft, maximumLeft)
+		} else if (this._horizontalAnchor) {
+			left = getChatPetAnchoredHorizontalPosition(this._horizontalAnchor, minimumLeft, maximumLeft)
+		} else {
+			left = getChatPetHorizontalPosition(this._left ?? minimumLeft, minimumLeft, maximumLeft)
+		}
+		this._left = left
+		this._top = this._restingTop()
+		setButtonPosition(this.button, this._left, this._top)
+		this._updateWideLayers()
 	}
 
-	_syncObserver(seat, chat) {
-		if (this._observedSeat !== seat) {
+	_syncObserver(seat, chat, input) {
+		if (this._observedSeat !== seat || this._observedChat !== chat || this._observedInput !== input) {
 			this._resizeObserver.disconnect()
 			this._resizeObserver.observe(seat)
 			this._resizeObserver.observe(chat)
+			this._resizeObserver.observe(input)
+			this._mutationObserver.disconnect()
+			this._mutationObserver.observe(seat, { childList: true, subtree: true })
 			this._observedSeat = seat
 			this._observedChat = chat
+			this._observedInput = input
 		}
 	}
 
 	_restingTop() {
-		if (!this.seatRect) return 0
-		return this.seatRect.top - this.displaySize
+		if (!this.inputRect) return 0
+		return this.inputRect.top - this.displaySize
 	}
 
 	_bounds() {
-		const seat = this.seatRect
 		const chat = this.chatRect
-		if (!seat || !chat) return undefined
+		const input = this.inputRect
+		if (!chat || !input) return undefined
 		return {
-			minimumLeft: seat.left,
-			maximumLeft: Math.max(seat.left, seat.right - this.displaySize),
+			// VS Code throws the pet across its whole chat widget, but only the
+			// input card is a landing platform.
+			minimumLeft: chat.left,
+			maximumLeft: Math.max(chat.left, chat.right - this.displaySize),
 			minimumTop: chat.top,
 			floorTop: chat.bottom - this.displaySize,
 			floorBottom: chat.bottom,
-			seatTop: seat.top,
+			inputLeft: input.left,
+			inputRight: input.right,
+			inputTop: input.top,
 		}
+	}
+
+	_inputBounds() {
+		const input = this.inputRect
+		if (!input) return undefined
+		return {
+			minimumLeft: input.left,
+			maximumLeft: Math.max(input.left, input.right - this.displaySize),
+		}
+	}
+
+	_rememberHorizontalPosition(left, input = this.inputRect) {
+		this._customPosition = true
+		if (!input) return
+		this._horizontalAnchor = getChatPetHorizontalAnchor(left, input.left, Math.max(input.left, input.right - this.displaySize))
+	}
+
+	_forgetHorizontalPosition() {
+		this._customPosition = false
+		this._horizontalAnchor = undefined
 	}
 
 	/* ---------------------------------------------------------------- state */
@@ -680,14 +743,15 @@ class ChatPetController {
 	}
 
 	_updateWideLayers() {
-		if (!this.seatRect || !this.button) return
+		if (!this.inputRect || !this.button) return
+		const input = this.inputRect
 		const rect = this.button.getBoundingClientRect()
-		const offset = getChatPetWideSpriteHorizontalOffset(this.renderedState, this._facing.direction, rect.left, rect.right, this.seatRect.left, this.seatRect.right, this.scale)
+		const offset = getChatPetWideSpriteHorizontalOffset(this.renderedState, this._facing.direction, rect.left, rect.right, input.left, input.right, this.scale)
 		const translate = offset === 0 ? '' : `${offset}px`
 		for (const element of [this.spriteContainers[this.activeSprite], this.eyes, this.eyeAccessoryContainer]) {
 			if (element) element.style.translate = translate
 		}
-		const bubbleLeft = shouldPlaceChatPetSpeechBubbleLeft(this.renderedState, rect.right, this.seatRect.right, this.scale)
+		const bubbleLeft = shouldPlaceChatPetSpeechBubbleLeft(this.renderedState, rect.right, input.right, this.scale)
 		this.button.classList.toggle('speech-bubble-left', bubbleLeft)
 	}
 
@@ -843,7 +907,7 @@ class ChatPetController {
 		const [left, top] = getChatPetDragPosition(drag.startLeft + dx, drag.startTop + dy, bounds.minimumLeft, bounds.maximumLeft, bounds.minimumTop, bounds.floorTop)
 		this._left = left
 		this._top = top
-		this._customPosition = true
+		this._rememberHorizontalPosition(left)
 		setButtonPosition(this.button, left, top)
 		this._updateBounceCounterPosition()
 		this._updateWideLayers()
@@ -931,12 +995,13 @@ class ChatPetController {
 
 	_hopBy(delta) {
 		if (this.airborne || this.dead || this.onTheRun) return
-		const bounds = this._bounds()
+		const bounds = this._inputBounds()
 		if (!bounds) return
 		const next = getChatPetHorizontalPosition((this._left ?? bounds.minimumLeft) + delta, bounds.minimumLeft, bounds.maximumLeft)
 		this._left = next
-		this._customPosition = true
-		setButtonPosition(this.button, this._left, this._top ?? this._restingTop())
+		this._top = this._restingTop()
+		this._rememberHorizontalPosition(next)
+		setButtonPosition(this.button, this._left, this._top)
 		this._updateWideLayers()
 	}
 
@@ -983,8 +1048,8 @@ class ChatPetController {
 	/* -------------------------------------------------------------- flight */
 
 	_platform() {
-		if (!this.seatRect) return undefined
-		return { left: this.seatRect.left, right: this.seatRect.right, top: this.seatRect.top, isDefault: true }
+		if (!this.inputRect) return undefined
+		return { left: this.inputRect.left, right: this.inputRect.right, top: this.inputRect.top, isDefault: true }
 	}
 
 	_beginThrow(velocity, preserveBounceCount = false, mouseBounceDelay = 0) {
@@ -1005,6 +1070,7 @@ class ChatPetController {
 			motion: { left: rect.left, top: rect.top, x: velocity.x, y: velocity.y, rotation: 0 },
 			mouseBounceAvailableAt: performance.now() + mouseBounceDelay,
 			velocitySamples: [{ x: velocity.x, y: velocity.y }],
+			wallImpact: undefined,
 		}
 		this._clearIdle()
 		this._renderState('falling')
@@ -1013,43 +1079,84 @@ class ChatPetController {
 	}
 
 	_advanceThrow() {
-		if (!this._throw || this.dead || this.disposed) return
+		const throwState = this._throw
+		if (!throwState || this.dead || this.disposed) return
 		const now = performance.now()
-		const elapsed = Math.min(THROW_MAX_FRAME_DURATION, now - this._throw.lastTime)
-		this._throw.lastTime = now
+
+		// Freeze at the wall for a couple of frames, showing the impact pose,
+		// then rebound. This mirrors VS Code's wall-impact hold.
+		if (throwState.wallImpact) {
+			if (now < throwState.wallImpact.endsAt) {
+				requestAnimationFrame(this._throwFrame)
+				return
+			}
+			const rebound = getChatPetWallReboundVelocity(throwState.motion)
+			throwState.motion = { ...throwState.motion, x: rebound.x, y: rebound.y }
+			throwState.wallImpact = undefined
+			throwState.lastTime = now
+			this._renderState('falling')
+			requestAnimationFrame(this._throwFrame)
+			return
+		}
+
+		const elapsed = Math.min(THROW_MAX_FRAME_DURATION, Math.max(0, now - throwState.lastTime))
+		throwState.lastTime = now
 		const bounds = this._bounds()
 		if (!bounds) return
-		const previous = { ...this._throw.motion }
-		const step = advanceChatPetThrow(this._throw.motion, elapsed, bounds)
-		if (step.wall) {
-			this._renderState('wallImpact')
-			const rebound = getChatPetWallReboundVelocity(this._throw.motion)
-			this._throw.motion = { ...this._throw.motion, x: rebound.x, y: rebound.y }
-			setTimeout(() => {
-				if (this._throw && this.renderedState === 'wallImpact') this._renderState('falling')
-			}, CHAT_PET_WALL_IMPACT_DURATION)
-		}
-		const horizontalDistance = step.left - previous.left
-		const rotation = getChatPetThrowRotation(this._throw.motion.rotation ?? 0, horizontalDistance, step.y, elapsed)
-		this._throw.motion = { left: step.left, top: step.top, x: step.x, y: step.y, rotation }
-		this._left = step.left
-		this._top = step.top
-		setButtonPosition(this.button, step.left, step.top)
-		const centerX = step.left + this.displaySize / 2
+		const previous = { ...throwState.motion }
+		const step = advanceChatPetThrow(previous, elapsed, bounds)
+		const rotation = getChatPetThrowRotation(previous.rotation ?? 0, step.left - previous.left, step.y, elapsed)
 		const platform = this._platform()
 		const landing = getChatPetThrowLanding(previous.left, previous.top, step.left, step.top, this.displaySize, this.displaySize, platform ? [platform] : [], bounds.floorTop)
-		const rotate = step.wall ? 0 : rotation
-		this.button.style.transform = rotate === 0 ? '' : `rotate(${rotate}deg)`
-		this._updateBounceCounterPosition()
 		if (landing) {
+			throwState.motion = { left: step.left, top: step.top, x: step.x, y: step.y, rotation }
+			this._left = step.left
+			this._top = step.top
+			setButtonPosition(this.button, step.left, step.top)
+			this._updateBounceCounterPosition()
 			this._land(landing, step)
 			return
 		}
-		if (shouldSettleChatPetThrow(this._throw.startTime, now, step.top, step.y, bounds.floorTop)) {
+		if (step.wall) {
+			const wallRotation = step.wall === 'left' ? -90 : 90
+			throwState.motion = { left: step.left, top: step.top, x: step.x, y: step.y, rotation: wallRotation }
+			throwState.wallImpact = { wall: step.wall, endsAt: now + CHAT_PET_WALL_IMPACT_DURATION }
+			this._left = step.left
+			this._top = step.top
+			setButtonPosition(this.button, step.left, step.top)
+			this._facing.setDirection(step.wall)
+			this.button.dataset.facing = this._facing.direction
+			this._renderState('wallImpact')
+			this.button.style.transform = `rotate(${wallRotation}deg)`
+			this._updateBounceCounterPosition()
+			requestAnimationFrame(this._throwFrame)
+			return
+		}
+		throwState.motion = { left: step.left, top: step.top, x: step.x, y: step.y, rotation }
+		this._left = step.left
+		this._top = step.top
+		setButtonPosition(this.button, step.left, step.top)
+		this.button.style.transform = rotation === 0 ? '' : `rotate(${rotation}deg)`
+		this._updateBounceCounterPosition()
+		if (shouldSettleChatPetThrow(throwState.startTime, now, step.top, step.y, bounds.floorTop)) {
 			this._beginDeath([step.left, step.top])
 			return
 		}
 		requestAnimationFrame(this._throwFrame)
+	}
+
+	_refreshThrowBounds() {
+		if (!this._throw) return
+		const bounds = this._bounds()
+		if (!bounds) return
+		const motion = this._throw.motion
+		motion.left = getChatPetHorizontalPosition(motion.left, bounds.minimumLeft, bounds.maximumLeft)
+		motion.top = Math.max(bounds.minimumTop, motion.top)
+		this._left = motion.left
+		this._top = motion.top
+		setButtonPosition(this.button, motion.left, motion.top)
+		this._throw.lastTime = performance.now()
+		this._updateBounceCounterPosition()
 	}
 
 	_land(landing, step) {
@@ -1060,7 +1167,7 @@ class ChatPetController {
 		this._left = landing.left
 		this._top = landing.top
 		setButtonPosition(this.button, landing.left, landing.top)
-		this._customPosition = true
+		this._rememberHorizontalPosition(landing.left)
 		if (!landing.platform) {
 			this._beginDeath([landing.left, landing.top])
 			return
@@ -1153,6 +1260,7 @@ class ChatPetController {
 		this.button.classList.remove('throwing', 'falling')
 		this.button.style.transform = ''
 		this._deathPosition = position
+		this._respawnPosition = undefined
 		this._respawnPhase = 'despawning'
 		this.button.classList.add('hidden')
 		this.button.tabIndex = -1
@@ -1160,16 +1268,47 @@ class ChatPetController {
 		this._showRespawnSequence()
 	}
 
+	_respawnTop() {
+		if (!this.chatRect || !this.inputRect) return 0
+		return getChatPetRespawnTop(this.chatRect.top, this.inputRect.top)
+	}
+
+	_updateRespawnEffectPosition() {
+		if (!this.dead) return
+		const bounds = this._bounds()
+		if (!bounds) return
+		if (this._respawnPhase === 'respawning') {
+			const minimumLeft = bounds.inputLeft
+			const maximumLeft = Math.max(minimumLeft, bounds.inputRight - this.displaySize)
+			const left = this._respawnPosition?.[0] ?? getChatPetDefaultHorizontalPosition(minimumLeft, maximumLeft)
+			this._respawnPosition = [
+				getChatPetHorizontalPosition(left, minimumLeft, maximumLeft),
+				this._respawnTop(),
+			]
+		} else if (this._deathPosition) {
+			this._deathPosition = getChatPetDragPosition(
+				this._deathPosition[0],
+				this._deathPosition[1],
+				bounds.minimumLeft,
+				bounds.maximumLeft,
+				bounds.minimumTop,
+				bounds.floorTop,
+			)
+		}
+		const position = this._respawnPhase === 'respawning'
+			? this._respawnPosition
+			: (this._deathPosition ?? [this._left, this._top])
+		if (!position) return
+		this.respawnContainer.style.left = `${position[0]}px`
+		this.respawnContainer.style.top = `${position[1]}px`
+	}
+
 	_showRespawnSequence() {
 		if (!this.dead) return
 		this.respawnContainer.classList.remove('hidden')
 		const bounds = this._bounds()
 		if (!bounds) return
-		const position = this._respawnPhase === 'respawning'
-			? (this._respawnPosition ?? [getChatPetDefaultHorizontalPosition(bounds.minimumLeft, bounds.maximumLeft), bounds.minimumTop])
-			: (this._deathPosition ?? [this._left, this._top])
-		this.respawnContainer.style.left = `${position[0]}px`
-		this.respawnContainer.style.top = `${position[1]}px`
+		this._updateRespawnEffectPosition()
 		const sources = getChatPetRespawnSources(this.variant)
 		const source = this._motionReduced ? sources.reducedMotion : sources.animated
 		const image = getChatPetCachedImage(source.url)
@@ -1215,7 +1354,11 @@ class ChatPetController {
 		if (this._respawnPhase === 'despawning') {
 			this._respawnPhase = 'respawning'
 			const bounds = this._bounds()
-			if (bounds) this._respawnPosition = [getChatPetDefaultHorizontalPosition(bounds.minimumLeft, bounds.maximumLeft), bounds.minimumTop]
+			if (bounds) {
+				const minimumLeft = bounds.inputLeft
+				const maximumLeft = Math.max(minimumLeft, bounds.inputRight - this.displaySize)
+				this._respawnPosition = [getChatPetDefaultHorizontalPosition(minimumLeft, maximumLeft), this._respawnTop()]
+			}
 			this._showRespawnSequence()
 			return
 		}
@@ -1226,10 +1369,17 @@ class ChatPetController {
 		this.button.tabIndex = 0
 		const bounds = this._bounds()
 		if (bounds) {
-			this._left = this._respawnPosition?.[0] ?? getChatPetDefaultHorizontalPosition(bounds.minimumLeft, bounds.maximumLeft)
-			this._top = bounds.minimumTop
+			const minimumLeft = bounds.inputLeft
+			const maximumLeft = Math.max(minimumLeft, bounds.inputRight - this.displaySize)
+			this._left = getChatPetHorizontalPosition(
+				this._respawnPosition?.[0] ?? getChatPetDefaultHorizontalPosition(minimumLeft, maximumLeft),
+				minimumLeft,
+				maximumLeft,
+			)
+			this._top = this._respawnTop()
 			setButtonPosition(this.button, this._left, this._top)
-			this._customPosition = true
+			this._forgetHorizontalPosition()
+			this._respawnPosition = undefined
 			this._beginFall()
 		}
 	}
@@ -1375,6 +1525,7 @@ class ChatPetController {
 		clearInterval(this._runTimer)
 		if (this._gazeRaf !== undefined) cancelAnimationFrame(this._gazeRaf)
 		this._resizeObserver?.disconnect()
+		this._mutationObserver?.disconnect()
 		for (const remove of this._listeners ?? []) remove()
 		if (this._motionQuery?.removeEventListener && this._motionListener) this._motionQuery.removeEventListener('change', this._motionListener)
 		this._jumpGame?.destroy()

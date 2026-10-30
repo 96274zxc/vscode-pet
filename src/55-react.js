@@ -394,7 +394,24 @@ function PetSlot(props) {
 		const seat = anchor.closest('[data-composer-seat]')
 		const chat = anchor.closest('[data-conversation-region="chat"]')
 		if (!seat || !chat) return null
-		return { seat, chat }
+		// The seat wraps the whole composer stack (hero, input dock and card) and
+		// can be much taller and wider than the visible input. Use the composer
+		// card itself as the pet's reliable perch.
+		let input = anchor.closest('[data-composer-card]')
+		if (!input) {
+			const anchorRect = anchor.getBoundingClientRect()
+			let bestDistance = Infinity
+			for (const card of seat.querySelectorAll('[data-composer-card]')) {
+				const rect = card.getBoundingClientRect()
+				if (rect.width <= 0 || rect.height <= 0) continue
+				const distance = Math.abs(rect.top - anchorRect.top)
+				if (distance < bestDistance) {
+					bestDistance = distance
+					input = card
+				}
+			}
+		}
+		return { seat, chat, input }
 	}, [])
 
 	React.useEffect(() => {

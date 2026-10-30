@@ -131,6 +131,24 @@ test('landing prefers a platform under the center then floor', () => {
 	assert.equal(floor.top, 452)
 })
 
+test('respawn drops from a bounded perch above the composer', () => {
+	assert.equal(t.getChatPetRespawnTop(0, 1000), 640)
+	assert.equal(t.getChatPetRespawnTop(700, 800), 700)
+	assert.equal(t.getChatPetRespawnTop(0, 200, 100), 100)
+	assert.equal(t.getChatPetRespawnTop(0, 1000, 0), 1000)
+})
+
+test('horizontal anchors survive composer resize and scale changes', () => {
+	const right = t.getChatPetHorizontalAnchor(400, 100, 452)
+	assert.equal(right.edge, 'right')
+	assert.equal(right.inset, 52)
+	assert.equal(t.getChatPetAnchoredHorizontalPosition(right, 200, 552), 500)
+	const left = t.getChatPetHorizontalAnchor(120, 100, 452)
+	assert.equal(left.edge, 'left')
+	assert.equal(left.inset, 20)
+	assert.equal(t.getChatPetAnchoredHorizontalPosition(left, 300, 752), 320)
+})
+
 test('scale, horizontal position and wide sprites clamp exactly', () => {
 	assert.equal(t.getChatPetScale(1, -0.2), 0.8)
 	assert.equal(t.getChatPetScale(0.4, -0.2), 0.4)

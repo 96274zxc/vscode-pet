@@ -108,6 +108,7 @@ const __test = {
 	getChatPetThrowLanding,
 	getChatPetFallTarget,
 	getChatPetFallDuration,
+	getChatPetRespawnTop,
 	getChatPetWideSpriteHorizontalOffset,
 	shouldPlaceChatPetSpeechBubbleLeft,
 	getChatPetFrameDurations,

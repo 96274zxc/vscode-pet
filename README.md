@@ -31,7 +31,9 @@ Thanks to the VS Code team and the original Blobby authors for the character and
 - Sits on top of the composer and reacts to chat: pointer gaze, typing, thinking, clapping when the
   agent needs input, sleeping after 20 seconds, and the red-button celebration when a turn finishes.
 - Drag it, flick it, throw it with `Shift+←/→`, hop with `←/→`, catch it while it falls, and watch
-  the despawn/respawn portal sequence.
+  the despawn/respawn portal sequence. The composer card is its only perch: it spawns and respawns
+  above that card, follows it when the window or input grows/shrinks, bounces off the side walls,
+  and its respawn drop is capped above the composer instead of falling from the top of the chat.
 - Right-click for **Achievements**, **Play Jump Game**, **Go on the Run / Come Back**,
   **Grow / Shrink / Reset Size** and **Change Color**.
 - 14 achievements and 13 hats from the official catalog. Event-driven achievement tracking is
@@ -112,4 +114,9 @@ clapping/sleep/reactions, drag and throw, despawn/respawn, the context menu, bot
 tabs, hat and color selection, True Name unlock, and the jump game. `docs/states.png` is the
 state matrix and `docs/achievements.png` / `docs/color.png` are the customization panels from that
 run.
+
+It was then verified in the real Electron desktop profile (not headless): composer-card landings,
+default spawn, maximize/restore repositioning, rotated wall bounces, capped respawn, and resizing
+while the pet is airborne. The fall and respawn paths were also compared frame by frame against
+VS Code 1.144's Blobby on the same machine.
 
