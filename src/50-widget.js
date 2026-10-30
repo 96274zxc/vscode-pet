@@ -738,7 +738,12 @@ class ChatPetController {
 		const mirrors = accessory?.eyeAccessoryMirrorsWithFacing !== false
 		const fixed = !mirrors
 		this.eyeAccessoryContainer.classList.toggle('fixed-orientation', fixed)
-		const gazeOffset = mirrors ? undefined : getChatPetEyeAccessoryGazeOffset(this._gaze)
+		// The monocle only follows the cursor while Blobby is awake and tracking
+		// it. Sleep/waking (and other non-tracking poses) keep the glasses fixed
+		// to the face; otherwise the whole monocle slides with the pointer.
+		const gazeOffset = !mirrors
+			? getChatPetEyeAccessoryGazeOffsetForState(state, this._gaze)
+			: undefined
 		drawChatPetEyeAccessory(context, image, state, frameIndex ?? this.activeFrameIndex, this._facing.direction, mirrors, gazeOffset)
 	}
 
@@ -821,11 +826,10 @@ class ChatPetController {
 			const centerX = rect.left + rect.width / 2
 			const centerY = rect.top + rect.height / 2
 			const next = getChatPetGazeDirection(this._cursor.x, this._cursor.y, centerX, centerY)
-			if (this._facing.update(this._cursor.x, centerX) !== this._lastFacing) {
-				this._lastFacing = this._facing.direction
-				if (this.renderedState === 'idle' && this._directionChanges.record(this._lastFacing, performance.now())) {
-					this._showTransientState('dizzy')
-				}
+			const facing = this._facing.update(this._cursor.x, centerX)
+			if (facing !== this._lastFacing) {
+				this._lastFacing = facing
+				this._recordDirectionChange(facing)
 			}
 			this._gaze = next
 			this._applyGaze()
@@ -833,6 +837,13 @@ class ChatPetController {
 			this._updateEyeAccessory(this.renderedState ?? 'idle', this.activeFrameIndex)
 			this._updateWideLayers()
 		})
+	}
+
+	_recordDirectionChange(direction) {
+		if (this.disposed || this.dead || this.onTheRun || this.transientState === 'dizzy') return false
+		if (!this._directionChanges.record(direction, performance.now())) return false
+		this._showTransientState('dizzy', false)
+		return true
 	}
 
 	_applyGaze() {

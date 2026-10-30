@@ -92,6 +92,7 @@ const __test = {
 	getChatPetBlinkDelay,
 	getChatPetGazeDirection,
 	getChatPetEyeAccessoryGazeOffset,
+	getChatPetEyeAccessoryGazeOffsetForState,
 	getChatPetScale,
 	getChatPetHorizontalPosition,
 	getChatPetDefaultHorizontalPosition,

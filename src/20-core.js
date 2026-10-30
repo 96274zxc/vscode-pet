@@ -168,6 +168,10 @@ function getChatPetEyeAccessoryGazeOffset(gazeDirection) {
 	return [gazeDirection[0] * 4, gazeDirection[1] * 4]
 }
 
+function getChatPetEyeAccessoryGazeOffsetForState(state, gazeDirection) {
+	return doesChatPetStateTrackCursor(state) ? getChatPetEyeAccessoryGazeOffset(gazeDirection) : undefined
+}
+
 function getChatPetHorizontalPosition(left, minimumLeft, maximumLeft) {
 	return Math.max(minimumLeft, Math.min(Math.max(minimumLeft, maximumLeft), left))
 }

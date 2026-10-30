@@ -149,6 +149,28 @@ test('horizontal anchors survive composer resize and scale changes', () => {
 	assert.equal(t.getChatPetAnchoredHorizontalPosition(left, 300, 752), 320)
 })
 
+test('dizzy triggers after eight quick gaze direction changes', () => {
+	const controller = new t.ChatPetDirectionChangeController()
+	const changes = ['left', 'right', 'left', 'right', 'left', 'right', 'left', 'right', 'left']
+	const results = changes.map((direction, index) => controller.record(direction, 1000 + index * 100))
+	assert.equal(results.slice(0, 8).includes(true), false)
+	assert.equal(results[8], true)
+	const slow = new t.ChatPetDirectionChangeController()
+	const slowResults = changes.map((direction, index) => slow.record(direction, 1000 + index * 1000))
+	assert.equal(slowResults.includes(true), false)
+})
+
+test('eye accessories follow gaze only while Blobby tracks the cursor', () => {
+	assert.equal(t.doesChatPetStateTrackCursor('idle'), true)
+	assert.equal(t.doesChatPetStateTrackCursor('sleep'), false)
+	assert.equal(t.doesChatPetStateTrackCursor('waking'), false)
+	assert.equal(t.getChatPetEyeAccessoryGazeOffsetForState('sleep', [1, 0]), undefined)
+	assert.equal(t.getChatPetEyeAccessoryGazeOffsetForState('waking', [1, 0]), undefined)
+	const offset = t.getChatPetEyeAccessoryGazeOffsetForState('idle', [1, 0])
+	assert.equal(offset[0], 4)
+	assert.equal(offset[1], 0)
+})
+
 test('scale, horizontal position and wide sprites clamp exactly', () => {
 	assert.equal(t.getChatPetScale(1, -0.2), 0.8)
 	assert.equal(t.getChatPetScale(0.4, -0.2), 0.4)
