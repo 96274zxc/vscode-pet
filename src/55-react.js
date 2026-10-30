@@ -228,7 +228,7 @@ function HatsPanel(props) {
 				})),
 				h('div', { key: 'content', className: 'chat-pet-achievement-card-content' }, [
 					h('h3', { key: 'title' }, t(accessory.key)),
-					wearing ? h('span', { key: 'state', className: 'chat-pet-achievement-state' }, t('achievements.wearing')) : null,
+					h('span', { key: 'state', className: 'chat-pet-achievement-state' }, wearing ? t('achievements.wearing') : '\u00a0'),
 				]),
 			]),
 		])
@@ -256,7 +256,7 @@ function HatsPanel(props) {
 					h('div', { key: 'preview', className: 'chat-pet-achievement-previews' }, h(ChatPetPreview, { accessoryId: null, unlocked: true, color: prefs.color, variant })),
 					h('div', { key: 'content', className: 'chat-pet-achievement-card-content' }, [
 						h('h3', { key: 'title' }, t('achievements.noHat')),
-						noHatWearing ? h('span', { key: 'state', className: 'chat-pet-achievement-state' }, t('achievements.wearing')) : null,
+						h('span', { key: 'state', className: 'chat-pet-achievement-state' }, noHatWearing ? t('achievements.wearing') : '\u00a0'),
 					]),
 				])),
 				...hats.map(card),
