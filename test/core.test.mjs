@@ -212,6 +212,10 @@ test('English and Chinese catalogs stay complete and in sync', () => {
 	assert.equal(en['menu.changeColor'], 'Change Color')
 	assert.equal(en['achievement.blobby.title'], 'Color Customization')
 	assert.equal(zh['achievement.blobby.title'], '颜色自定义')
+	assert.equal(en['color.stable'], 'Stable')
+	assert.equal(zh['color.stable'], '稳定版')
+	assert.equal(en['color.insiders'], 'Insiders')
+	assert.equal(zh['color.insiders'], '预览版')
 })
 
 test('locale fallback follows the host language before DSH t is ready', () => {
