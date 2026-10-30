@@ -1,0 +1,863 @@
+{
+  "source": "microsoft/vscode",
+  "commit": "ce233327f26ef7791b7fff0143c24e81a8126bd2",
+  "fetchedAt": "2026-10-30T06:45:08.770Z",
+  "files": [
+    {
+      "name": "accessories/artist-beret.png",
+      "width": 384,
+      "height": 288,
+      "bytes": 904,
+      "sha256": "3458e0c7959e700f7bff4d71a7249f385b21785ad7fb01b37d8c9288f52064f6",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/accessories/artist-beret.png"
+    },
+    {
+      "name": "accessories/bamboo-hat.png",
+      "width": 384,
+      "height": 288,
+      "bytes": 881,
+      "sha256": "1ad963b2987c1aad09fbf1d5b8489a06e1e40648c7b6a4a532c884447cb048bc",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/accessories/bamboo-hat.png"
+    },
+    {
+      "name": "accessories/baseball-cap.png",
+      "width": 384,
+      "height": 288,
+      "bytes": 935,
+      "sha256": "b9dad2d28741e0d06005c056f3eb9601ac04f15d2b831bb2e135069e9d4b8172",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/accessories/baseball-cap.png"
+    },
+    {
+      "name": "accessories/construction-hard-hat.png",
+      "width": 384,
+      "height": 288,
+      "bytes": 937,
+      "sha256": "1f1875371168099b142f698b7387a04f96bef42b0cb01fe25fde88eac02128b6",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/accessories/construction-hard-hat.png"
+    },
+    {
+      "name": "accessories/cowboy-hat.png",
+      "width": 384,
+      "height": 288,
+      "bytes": 946,
+      "sha256": "67172cbe8cc9679126c59444e355a9b406a29c650ee74d83ba94d5f72ecc61b4",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/accessories/cowboy-hat.png"
+    },
+    {
+      "name": "accessories/crown.png",
+      "width": 384,
+      "height": 288,
+      "bytes": 970,
+      "sha256": "7fdabed66d0b6c8c952f697bb9cd14cd74536929d8af90d86b072aa1f6bb6177",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/accessories/crown.png"
+    },
+    {
+      "name": "accessories/dark-sailor-hat.png",
+      "width": 384,
+      "height": 288,
+      "bytes": 1003,
+      "sha256": "9251747beccfc60847db1bd29ebd8051e069249f6c6b47530794b73c959957f3",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/accessories/dark-sailor-hat.png"
+    },
+    {
+      "name": "accessories/firefighter-helmet.png",
+      "width": 384,
+      "height": 288,
+      "bytes": 1068,
+      "sha256": "6fee6296f7b8fb0fb518178d262ea48f88c456ed3f1bacfc8b3bd2740c00a87a",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/accessories/firefighter-helmet.png"
+    },
+    {
+      "name": "accessories/full-size-spinner-hat.png",
+      "width": 384,
+      "height": 288,
+      "bytes": 995,
+      "sha256": "990f364fcc80aedf3ae3616e0360db57dc5637129c198ccdb628f4c24b77fced",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/accessories/full-size-spinner-hat.png"
+    },
+    {
+      "name": "accessories/grand-top-hat-monocle.png",
+      "width": 384,
+      "height": 288,
+      "bytes": 1050,
+      "sha256": "d2772e44124d556b06e3ea798abd90fbb5547166195264d9bd7d2112ce1efeb8",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/accessories/grand-top-hat-monocle.png"
+    },
+    {
+      "name": "accessories/leaning-party-hat.png",
+      "width": 384,
+      "height": 288,
+      "bytes": 973,
+      "sha256": "1ee8ac224ebb4dd2c68f5a64b3dcc9d81248d25944365c4ba2774feb065badce",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/accessories/leaning-party-hat.png"
+    },
+    {
+      "name": "accessories/pink-party-hat.png",
+      "width": 384,
+      "height": 288,
+      "bytes": 927,
+      "sha256": "04cf0d9c2c3ceb986bc6616b86383bb0d486853d8ef629a2603a6643eaee6680",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/accessories/pink-party-hat.png"
+    },
+    {
+      "name": "accessories/propeller-hat.png",
+      "width": 384,
+      "height": 288,
+      "bytes": 896,
+      "sha256": "fe24ca1278ff5835a297fd80eae116b4dac22d9b8dc08154403b1691fa3d42ce",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/accessories/propeller-hat.png"
+    },
+    {
+      "name": "accessories/sailor-hat.png",
+      "width": 384,
+      "height": 288,
+      "bytes": 836,
+      "sha256": "7058333e64ffbeb83d8219efdd210da1ca0a0034d6f8c35ee38495d0521f7f42",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/accessories/sailor-hat.png"
+    },
+    {
+      "name": "accessories/straw-hat.png",
+      "width": 384,
+      "height": 288,
+      "bytes": 947,
+      "sha256": "046b01575bc2da00be0de37461596a4e8316d9906e2f6ced7bb3031827d35a2e",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/accessories/straw-hat.png"
+    },
+    {
+      "name": "accessories/white-chef-hat.png",
+      "width": 384,
+      "height": 288,
+      "bytes": 880,
+      "sha256": "905641150065d3abe9c994e261d231267af2fcb541caf090ca65fabeffe77f27",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/accessories/white-chef-hat.png"
+    },
+    {
+      "name": "accessories/wizard-hat.png",
+      "width": 384,
+      "height": 288,
+      "bytes": 1016,
+      "sha256": "0ef8de42ac6e46e535e93daa2384ffc9473147f5954ee70d350765dc2ec17e9c",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/accessories/wizard-hat.png"
+    },
+    {
+      "name": "buddy-clapping-insiders-tracking-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 389,
+      "sha256": "5e3aef2148a6360526f54ee322dae5b1f2d5ffc6a40b0bcc4e2feae637e78145",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-clapping-insiders-tracking-96.png"
+    },
+    {
+      "name": "buddy-clapping-insiders-tracking-96.spritesheet.png",
+      "width": 1248,
+      "height": 96,
+      "bytes": 3385,
+      "sha256": "ae58d04f73f1b9c35dd02944d4597487b1e3436cbd143a15d32412549591a467",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-clapping-insiders-tracking-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-clapping-stable-tracking-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 396,
+      "sha256": "88c42a942cdbd990adb1b77842a005df77d694e4d96b2a999dfcab4e12fcbbb2",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-clapping-stable-tracking-96.png"
+    },
+    {
+      "name": "buddy-clapping-stable-tracking-96.spritesheet.png",
+      "width": 1248,
+      "height": 96,
+      "bytes": 3371,
+      "sha256": "dd16d55054157f1e493a5217b06e9171fafd76f14fac59f3248eafa13aa438ef",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-clapping-stable-tracking-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-cool-insiders-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 459,
+      "sha256": "ad6cff958ee29fa40a9abc06110198a0c9ea0af593238afca935c3fc7d7f36d7",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-cool-insiders-96.png"
+    },
+    {
+      "name": "buddy-cool-insiders-96.spritesheet.png",
+      "width": 864,
+      "height": 96,
+      "bytes": 1628,
+      "sha256": "456cedf0d592be573cd1c20d8b863ec52b4dcf2fb4cbba887643285c532d50af",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-cool-insiders-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-cool-stable-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 460,
+      "sha256": "ca2d386bddf1fe32a9317da2ecad8ca1762d5adbe8a1ea7c692c684e80f892e7",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-cool-stable-96.png"
+    },
+    {
+      "name": "buddy-cool-stable-96.spritesheet.png",
+      "width": 864,
+      "height": 96,
+      "bytes": 1633,
+      "sha256": "f083e7db01ec742f3630d2aca8ea05bf5ed23307a219862c9c9b8e627197e987",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-cool-stable-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-dizzy-insiders-128.png",
+      "width": 96,
+      "height": 128,
+      "bytes": 483,
+      "sha256": "49e5f2f588c63bdf8fcecfeb411eb8750137b1964e706ffba76c76e8131e4a3e",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-dizzy-insiders-128.png"
+    },
+    {
+      "name": "buddy-dizzy-insiders-128.spritesheet.png",
+      "width": 768,
+      "height": 128,
+      "bytes": 1216,
+      "sha256": "a45a7e23f198e6707971e9e549ad0eee5a0fe1326d81dc4b7af3fb7ceb9facca",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-dizzy-insiders-128.spritesheet.png"
+    },
+    {
+      "name": "buddy-dizzy-stable-128.png",
+      "width": 96,
+      "height": 128,
+      "bytes": 481,
+      "sha256": "3504beee8a1a799fb652dce596b2b6e7516685c026f2e42dacc01a42898409d3",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-dizzy-stable-128.png"
+    },
+    {
+      "name": "buddy-dizzy-stable-128.spritesheet.png",
+      "width": 768,
+      "height": 128,
+      "bytes": 1215,
+      "sha256": "ae261e9d72d7efc0e16efd51448032ba259524c29794ead44b5e698770173edf",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-dizzy-stable-128.spritesheet.png"
+    },
+    {
+      "name": "buddy-falling-insiders-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 361,
+      "sha256": "b53e35bd3855a7070ac7a8b65612bfbd4b9be901a903f6a4b0323ef38e324d7e",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-falling-insiders-96.png"
+    },
+    {
+      "name": "buddy-falling-insiders-96.spritesheet.png",
+      "width": 576,
+      "height": 96,
+      "bytes": 808,
+      "sha256": "6723bd919d2bd3dabd1175915f16c7acbf82aa739f4f37a19e1ec4069a2eb497",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-falling-insiders-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-falling-stable-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 362,
+      "sha256": "41244c03610702b4b72dc3cb1cb29f0b12f34c744ae29513b6dce3ea464c2f11",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-falling-stable-96.png"
+    },
+    {
+      "name": "buddy-falling-stable-96.spritesheet.png",
+      "width": 576,
+      "height": 96,
+      "bytes": 788,
+      "sha256": "e11816671db68f6553f1c0e00077dc0899b4053f966ca950232c57f0d0f0fa87",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-falling-stable-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-idle-insiders-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 522,
+      "sha256": "540ff0471dd7adeb3b444ffa9867edf8b78536af06951c90cdd3d859a35a34ae",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-idle-insiders-96.png"
+    },
+    {
+      "name": "buddy-idle-insiders-96.spritesheet.png",
+      "width": 4800,
+      "height": 96,
+      "bytes": 4044,
+      "sha256": "5bddf8f7cddd62519ba765892a6f9b4e000e302e288ac3cf557289518d3dbe47",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-idle-insiders-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-idle-insiders-tracking-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 701,
+      "sha256": "9df2b289349c756677eb4a5a4d6dd9841c1b91186397e4caf3ee0f26f0b92871",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-idle-insiders-tracking-96.png"
+    },
+    {
+      "name": "buddy-idle-insiders-tracking-96.spritesheet.png",
+      "width": 4800,
+      "height": 96,
+      "bytes": 10592,
+      "sha256": "57bd2b3a3ed40e5daacf60d4cc8ac872fba077ec79614f27b1239ae425fd5cfd",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-idle-insiders-tracking-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-idle-stable-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 536,
+      "sha256": "500823a955c212f974159bc633e9e21664397e298ec35620100f4e1432732ac4",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-idle-stable-96.png"
+    },
+    {
+      "name": "buddy-idle-stable-96.spritesheet.png",
+      "width": 4800,
+      "height": 96,
+      "bytes": 4033,
+      "sha256": "612de3e8b212b08de8783a8458a69e8c13c0ee47e26ad2243d3658e572f49d2b",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-idle-stable-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-idle-stable-tracking-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 710,
+      "sha256": "a15918712a1b9ac77d925da2b90bc06e0cbd18c5b74ae20e36c60b84732bba7d",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-idle-stable-tracking-96.png"
+    },
+    {
+      "name": "buddy-idle-stable-tracking-96.spritesheet.png",
+      "width": 4800,
+      "height": 96,
+      "bytes": 10564,
+      "sha256": "a23a30417218ff4c5e48990be0530030e7493b89e1d4d0ec9c00f63750fe7769",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-idle-stable-tracking-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-jump-insiders-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 429,
+      "sha256": "182243c7ec26651fd23f7f2971dc72b83604314a15b08800e219c1aeb0e7d9c9",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-jump-insiders-96.png"
+    },
+    {
+      "name": "buddy-jump-insiders-96.spritesheet.png",
+      "width": 576,
+      "height": 96,
+      "bytes": 981,
+      "sha256": "a825d154422411813a995f593c13dbb1c8887a896ada378144bfebcc33f4e5d2",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-jump-insiders-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-jump-stable-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 443,
+      "sha256": "7bbdbaa11d033a2bbcba82d3ef14df9f847f1d7425c649c11353c652bebf409d",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-jump-stable-96.png"
+    },
+    {
+      "name": "buddy-jump-stable-96.spritesheet.png",
+      "width": 576,
+      "height": 96,
+      "bytes": 981,
+      "sha256": "33e3ff1f5731d5c91e47f075063ff1854bb64c18754e56fbd324986306c78a11",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-jump-stable-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-love-insiders-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 360,
+      "sha256": "74b8b60f0a283acc59be421148037133af8f1017d9811a168d69905ac99e1bf0",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-love-insiders-96.png"
+    },
+    {
+      "name": "buddy-love-insiders-96.spritesheet.png",
+      "width": 576,
+      "height": 96,
+      "bytes": 749,
+      "sha256": "da3b6e58537c3bb6e9ce4577d4660e3deb1ec7646646062d975fb54b264b74ba",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-love-insiders-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-love-stable-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 368,
+      "sha256": "4fa49864f23c59a79a3125bbab6071ba44f3cfbcbf41b8ac96d6ea4d544681b6",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-love-stable-96.png"
+    },
+    {
+      "name": "buddy-love-stable-96.spritesheet.png",
+      "width": 576,
+      "height": 96,
+      "bytes": 754,
+      "sha256": "9a5ab00592cdc3d745be81ae7ab1c3b7da8f75b8eebde958e18eec50493723ca",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-love-stable-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-painting-insiders-96.png",
+      "width": 192,
+      "height": 96,
+      "bytes": 738,
+      "sha256": "39e7f389eb8ee78b20b7d0907c7ce6b1493a9b2fc54036d1046848d9f7452309",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-painting-insiders-96.png"
+    },
+    {
+      "name": "buddy-painting-insiders-96.spritesheet.png",
+      "width": 1536,
+      "height": 96,
+      "bytes": 1968,
+      "sha256": "88a07b1f69b316ce190d6d7c98c8e0dba789eafac86b220e0d15cda8b3a18112",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-painting-insiders-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-painting-stable-96.png",
+      "width": 192,
+      "height": 96,
+      "bytes": 741,
+      "sha256": "68b3d4804fab6bdf96050bd40d254e51bbb096c9275a9a5e18c4d89789a248c8",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-painting-stable-96.png"
+    },
+    {
+      "name": "buddy-painting-stable-96.spritesheet.png",
+      "width": 1536,
+      "height": 96,
+      "bytes": 1971,
+      "sha256": "fe78b5bdee88539e4776a438ac5171ba669e143bd02203fe87c405badf325984",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-painting-stable-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-press-button-insiders-96.png",
+      "width": 160,
+      "height": 96,
+      "bytes": 428,
+      "sha256": "41367a7c0945b3cb98086a61c119e5bc752e0202d63a735f468a2c95fb05dc74",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-press-button-insiders-96.png"
+    },
+    {
+      "name": "buddy-press-button-insiders-96.spritesheet.png",
+      "width": 960,
+      "height": 96,
+      "bytes": 983,
+      "sha256": "740b62b0093685be3a81f162d503a9f47b09f1ad781ffdeeec2d6cc8371149e5",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-press-button-insiders-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-press-button-stable-96.png",
+      "width": 160,
+      "height": 96,
+      "bytes": 437,
+      "sha256": "07ed783e0a511d2cab072e4729495efd88e527a6d3c3f8f2cb1effecf4b1fec9",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-press-button-stable-96.png"
+    },
+    {
+      "name": "buddy-press-button-stable-96.spritesheet.png",
+      "width": 960,
+      "height": 96,
+      "bytes": 987,
+      "sha256": "5201494399b42aa80ef01b7385e247af9c61fcd8cdec6fbe5ff44c18a79935ee",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-press-button-stable-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-rendering-insiders-tracking-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 329,
+      "sha256": "50ab472981e39815d6a42b57226a80ae07b88c7ee1403974c85f0684c10076ec",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-rendering-insiders-tracking-96.png"
+    },
+    {
+      "name": "buddy-rendering-insiders-tracking-96.spritesheet.png",
+      "width": 4800,
+      "height": 96,
+      "bytes": 3121,
+      "sha256": "b227c4f6a8982897631ab56daa61a7e3ffa051f67c95e2722416bdd860ea0737",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-rendering-insiders-tracking-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-rendering-stable-tracking-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 335,
+      "sha256": "a62864089324c020514a3a6479dbab8830dcfe18c312ad71cd79e8e59f6ce452",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-rendering-stable-tracking-96.png"
+    },
+    {
+      "name": "buddy-rendering-stable-tracking-96.spritesheet.png",
+      "width": 4800,
+      "height": 96,
+      "bytes": 3110,
+      "sha256": "3e89c1e9367ac64875f0a9ccf62f43a39364a146088f83924793369cd68cf5fd",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-rendering-stable-tracking-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-respawn-insiders-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 361,
+      "sha256": "abb755b6fc438a2d675a6d3448ce6ee2d841f5cc52ebd22364d93b5ec5b32260",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-respawn-insiders-96.png"
+    },
+    {
+      "name": "buddy-respawn-insiders-96.spritesheet.png",
+      "width": 576,
+      "height": 96,
+      "bytes": 765,
+      "sha256": "f513121f7e366bc956c31d6a12902961d9c79d4a0ccb2c2a8334ba5883f5f4f0",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-respawn-insiders-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-respawn-stable-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 361,
+      "sha256": "a85c403b0039d9bcf6a54ea14d2243e929b18f6cef7d774c57383cc3bafb0136",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-respawn-stable-96.png"
+    },
+    {
+      "name": "buddy-respawn-stable-96.spritesheet.png",
+      "width": 576,
+      "height": 96,
+      "bytes": 764,
+      "sha256": "76efe8bd4a5e4cecc8df131c6d3ab18560e37ac9f3d523643cfa0845b9174dcb",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-respawn-stable-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-search-insiders-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 409,
+      "sha256": "664600e461461b3b206705e4f26ef22693907c78190a3f819d783436b09f460c",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-search-insiders-96.png"
+    },
+    {
+      "name": "buddy-search-insiders-96.spritesheet.png",
+      "width": 384,
+      "height": 96,
+      "bytes": 680,
+      "sha256": "c49bc3d450632bb7d30ccac49e23fecb134126fe02d2674c00402ad364f98c3f",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-search-insiders-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-search-stable-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 421,
+      "sha256": "9729a0d1ed6d89ba5ab3760bb4dc61d55ce1ed4a2b0e18578e52cb08473da97b",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-search-stable-96.png"
+    },
+    {
+      "name": "buddy-search-stable-96.spritesheet.png",
+      "width": 384,
+      "height": 96,
+      "bytes": 682,
+      "sha256": "07972b1be2d04c16c0e8b81bda9cdefadc2e29b5d20df0a9e460c9dcba1a1f0c",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-search-stable-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-sing-insiders-124.png",
+      "width": 164,
+      "height": 124,
+      "bytes": 648,
+      "sha256": "08671e3cc47c8d2c7a069651cb79c53cea65e1da1df4ce624e235f234e5e2387",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-sing-insiders-124.png"
+    },
+    {
+      "name": "buddy-sing-insiders-124.spritesheet.png",
+      "width": 656,
+      "height": 124,
+      "bytes": 1214,
+      "sha256": "fa77a11956b5e5970ef7cc92bdc6b6b871920e44802da40991b6b60292a5cffe",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-sing-insiders-124.spritesheet.png"
+    },
+    {
+      "name": "buddy-sing-stable-124.png",
+      "width": 164,
+      "height": 124,
+      "bytes": 640,
+      "sha256": "6e2650780366f21b9c0aeef0d22df0743b97d27c2fbc768a0df3777a2a693a4c",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-sing-stable-124.png"
+    },
+    {
+      "name": "buddy-sing-stable-124.spritesheet.png",
+      "width": 656,
+      "height": 124,
+      "bytes": 1204,
+      "sha256": "8a09a94c2efd8b387a55ffa0d9d4f29057f372f2bac86d02d56990cef0049458",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-sing-stable-124.spritesheet.png"
+    },
+    {
+      "name": "buddy-sleep-insiders-96.png",
+      "width": 120,
+      "height": 96,
+      "bytes": 404,
+      "sha256": "540d2383772db5b66daac0ef7ce3513e0aee7c414f12c94852b5a068b798b547",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-sleep-insiders-96.png"
+    },
+    {
+      "name": "buddy-sleep-insiders-96.spritesheet.png",
+      "width": 960,
+      "height": 96,
+      "bytes": 1029,
+      "sha256": "1c44ae306c7db0797345300caa0128170454eb4f037b1f28a4476e519e5ea704",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-sleep-insiders-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-sleep-stable-96.png",
+      "width": 120,
+      "height": 96,
+      "bytes": 403,
+      "sha256": "5eb99f8b26d141085f4f2963e0e2e14aad3ec434afda8292baf34f814fac123b",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-sleep-stable-96.png"
+    },
+    {
+      "name": "buddy-sleep-stable-96.spritesheet.png",
+      "width": 960,
+      "height": 96,
+      "bytes": 1028,
+      "sha256": "1d8ea2b87504e8b3c360c9ba960809345cd3a0e29f2783b2706174d8db39b0a8",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-sleep-stable-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-speech-insiders-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 559,
+      "sha256": "384d14579e78e867f8e4be55e15a2d66da4ff172f835592c8a473ba73c5d4423",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-speech-insiders-96.png"
+    },
+    {
+      "name": "buddy-speech-insiders-96.spritesheet.png",
+      "width": 576,
+      "height": 96,
+      "bytes": 1528,
+      "sha256": "fb2a5b02828364d0addafc342dae11e7594b5a06ffe731e4052a0bfe375cd66b",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-speech-insiders-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-speech-stable-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 561,
+      "sha256": "7ff46ffeb01de1ba69ea26ffe55b78803e33e543bc6ff80d0593586ae051403c",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-speech-stable-96.png"
+    },
+    {
+      "name": "buddy-speech-stable-96.spritesheet.png",
+      "width": 576,
+      "height": 96,
+      "bytes": 1531,
+      "sha256": "0390fa427fbabd54e1f05eb2c6d540245e3b413cb5ee3ef4cc24516a15f0a494",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-speech-stable-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-speechless-insiders-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 438,
+      "sha256": "542dbca30883817e675cbb70129ec164d19f12c0a84c030e53959ae6c3d66fdd",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-speechless-insiders-96.png"
+    },
+    {
+      "name": "buddy-speechless-insiders-96.spritesheet.png",
+      "width": 480,
+      "height": 96,
+      "bytes": 787,
+      "sha256": "bbd9114a0c5ae19f65716cbed5cf74d357490a80f759c211ab9262522475688d",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-speechless-insiders-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-speechless-stable-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 442,
+      "sha256": "5f67b59fab7e46148916d98e3f7e1e9fbc3f8d50eb83df06509089c26a3af4fd",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-speechless-stable-96.png"
+    },
+    {
+      "name": "buddy-speechless-stable-96.spritesheet.png",
+      "width": 480,
+      "height": 96,
+      "bytes": 790,
+      "sha256": "cec3e2a13cc63e4feacbffdd73b96d883e174f9299f56f3955c68c3b4fff03ce",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-speechless-stable-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-splat-insiders-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 429,
+      "sha256": "182243c7ec26651fd23f7f2971dc72b83604314a15b08800e219c1aeb0e7d9c9",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-splat-insiders-96.png"
+    },
+    {
+      "name": "buddy-splat-insiders-96.spritesheet.png",
+      "width": 384,
+      "height": 96,
+      "bytes": 706,
+      "sha256": "f277e566cc4a201fd2de9cc3e8793bfa9f80f8ac6152bbb16944463a016d8729",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-splat-insiders-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-splat-stable-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 443,
+      "sha256": "7bbdbaa11d033a2bbcba82d3ef14df9f847f1d7425c649c11353c652bebf409d",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-splat-stable-96.png"
+    },
+    {
+      "name": "buddy-splat-stable-96.spritesheet.png",
+      "width": 384,
+      "height": 96,
+      "bytes": 708,
+      "sha256": "8a8ea6e3856b269d6ece796ed729b01668ccc1cc96036e6df707302972cd99be",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-splat-stable-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-typing-insiders-96.png",
+      "width": 168,
+      "height": 96,
+      "bytes": 429,
+      "sha256": "0cfcbed2a28aeeb27234f136c01dab2c56806221cf57cf4c5476ac933c7e17d7",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-typing-insiders-96.png"
+    },
+    {
+      "name": "buddy-typing-insiders-96.spritesheet.png",
+      "width": 336,
+      "height": 96,
+      "bytes": 552,
+      "sha256": "e76f6fce8799d113a2eba5dfd397c2aee3ae8fd01e61c61d4925974c4d5c7e27",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-typing-insiders-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-typing-stable-96.png",
+      "width": 168,
+      "height": 96,
+      "bytes": 431,
+      "sha256": "5c2632a21139729dffbe4c5388a9c20dcd1b05298e6c5093fc9f55329c24a83d",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-typing-stable-96.png"
+    },
+    {
+      "name": "buddy-typing-stable-96.spritesheet.png",
+      "width": 336,
+      "height": 96,
+      "bytes": 556,
+      "sha256": "1b93216cb7df0771d4eb128f9e7b6833f4c1c0d587ef7d7d7e5afde9f2a1230f",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-typing-stable-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-waking-insiders-96.png",
+      "width": 120,
+      "height": 96,
+      "bytes": 375,
+      "sha256": "ee35e67d6a7958603d63633a6afab0dbba5d26a5ed8597d8fb9b231df05d0d12",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-waking-insiders-96.png"
+    },
+    {
+      "name": "buddy-waking-insiders-96.spritesheet.png",
+      "width": 960,
+      "height": 96,
+      "bytes": 1105,
+      "sha256": "67b409319df3f3787735cd0d80b54583b9f7b8d47447fb06f9450f3899b01c8c",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-waking-insiders-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-waking-stable-96.png",
+      "width": 120,
+      "height": 96,
+      "bytes": 382,
+      "sha256": "bc4fff77ecc957ff0308c41309303c568f3cac5f664e9e7bca03f0d94bc37f37",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-waking-stable-96.png"
+    },
+    {
+      "name": "buddy-waking-stable-96.spritesheet.png",
+      "width": 960,
+      "height": 96,
+      "bytes": 1104,
+      "sha256": "fccfe17cca27c4251a5600284a6aa1e56481701718faa56db48b0167d6731834",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-waking-stable-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-wall-impact-insiders-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 247,
+      "sha256": "c230b668dadf92e7329dc49093651ed40e4f827fed8abaa2cbb122d5c7fb01aa",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-wall-impact-insiders-96.png"
+    },
+    {
+      "name": "buddy-wall-impact-stable-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 248,
+      "sha256": "0527f50f32ee64e2eaf5b5e491f22078d1307bcaf971c2b42ff34a6f76bfb094",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-wall-impact-stable-96.png"
+    },
+    {
+      "name": "buddy-worry-insiders-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 488,
+      "sha256": "721c0e5578c8e12dc1896a0471aaf2749caa6bef7531f01985e030c80cf95773",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-worry-insiders-96.png"
+    },
+    {
+      "name": "buddy-worry-insiders-96.spritesheet.png",
+      "width": 192,
+      "height": 96,
+      "bytes": 656,
+      "sha256": "03339167b1bf50f84b0234685d9b38a057d89c6c8dd42a3d7c8f4799407f057c",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-worry-insiders-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-worry-stable-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 486,
+      "sha256": "35d08b3c96686c90e252f3294e2089f13213c7b98081dc89407b570fb22600b8",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-worry-stable-96.png"
+    },
+    {
+      "name": "buddy-worry-stable-96.spritesheet.png",
+      "width": 192,
+      "height": 96,
+      "bytes": 659,
+      "sha256": "4def43e69a4472e12692e0d0bc4137250044ff1863ba446ff03496a0e8943267",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-worry-stable-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-yapping-insiders-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 440,
+      "sha256": "21638dafebf466b32b4653b2c00e7ca48a45cd5cb6db7eef33331d03b3f49618",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-yapping-insiders-96.png"
+    },
+    {
+      "name": "buddy-yapping-insiders-96.spritesheet.png",
+      "width": 480,
+      "height": 96,
+      "bytes": 1848,
+      "sha256": "1beeeeb042f6e41f2308feee49a70c9fe317cabd7245cf409ddda00e3ee6b39d",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-yapping-insiders-96.spritesheet.png"
+    },
+    {
+      "name": "buddy-yapping-stable-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 442,
+      "sha256": "34233b61f30f9f5d41b667aa6b26c765d8c73bbf53340ec5853dafd692f01261",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-yapping-stable-96.png"
+    },
+    {
+      "name": "buddy-yapping-stable-96.spritesheet.png",
+      "width": 480,
+      "height": 96,
+      "bytes": 1848,
+      "sha256": "faaa64eff019266a34c37e4c8450eeaf90d2dc69f997d126fe8a980beba7ff36",
+      "url": "https://raw.githubusercontent.com/microsoft/vscode/ce233327f26ef7791b7fff0143c24e81a8126bd2/src/vs/workbench/contrib/chat/browser/widget/media/chatPet/buddy-yapping-stable-96.spritesheet.png"
+    }
+  ]
+}

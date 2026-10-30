@@ -1,0 +1,994 @@
+/* Blobby surface, panels and jump game. Adapted from VS Code chatPet.css. */
+
+.dsh-blobby-layer {
+	position: fixed;
+	inset: 0;
+	z-index: 40;
+	pointer-events: none;
+}
+
+.dsh-blobby-portal {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+}
+
+.dsh-blobby-mount {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+}
+
+.dsh-blobby-anchor {
+	display: block;
+	width: 100%;
+	height: 0;
+	overflow: visible;
+}
+
+.dsh-blobby-status {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+.chat-pet-button {
+	position: absolute;
+	width: 48px;
+	height: 48px;
+	padding: 0;
+	border: 0;
+	outline: none;
+	background: transparent;
+	cursor: grab;
+	overflow: visible;
+	pointer-events: auto;
+	touch-action: none;
+	transition: transform 200ms ease-out;
+}
+
+.chat-pet-button.hidden {
+	display: none;
+}
+
+.chat-pet-button.dragging {
+	cursor: grabbing;
+	z-index: 45;
+}
+
+.chat-pet-button.falling {
+	cursor: default;
+	pointer-events: none;
+}
+
+.chat-pet-button.throwing {
+	cursor: default;
+	pointer-events: none;
+	transition: none;
+	will-change: left, top, transform;
+}
+
+.chat-pet-button.dragging.soft-resisting {
+	animation: chat-pet-drag-soft-resist 240ms steps(2, end) infinite;
+}
+
+.chat-pet-button.dragging.resisting {
+	animation: chat-pet-drag-resist 120ms steps(2, end) infinite;
+}
+
+.chat-pet-button:focus-visible {
+	outline: 2px solid var(--dsw-alias-brand-primary);
+	outline-offset: 2px;
+	border-radius: 8px;
+}
+
+.chat-pet-visual {
+	position: absolute;
+	left: 0;
+	bottom: 0;
+	width: 48px;
+	height: 48px;
+	transform-origin: bottom left;
+	pointer-events: none;
+}
+
+.chat-pet-sprite {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	display: block;
+	width: 48px;
+	height: 48px;
+	overflow: hidden;
+	image-rendering: pixelated;
+	pointer-events: none;
+}
+
+.chat-pet-sprite.hidden,
+.chat-pet-eye-accessory.hidden,
+.chat-pet-speech-bubble.hidden,
+.chat-pet-respawn-effect.hidden,
+.chat-pet-bounce-counter.hidden {
+	display: none;
+}
+
+.chat-pet-canvas {
+	display: block;
+	height: 48px;
+	image-rendering: pixelated;
+	pointer-events: none;
+}
+
+.chat-pet-button[data-facing='left'] .chat-pet-sprite,
+.chat-pet-button[data-facing='left'] .chat-pet-eye-accessory {
+	right: 0;
+	left: auto;
+}
+
+.chat-pet-button[data-facing='left'] .chat-pet-sprite > .chat-pet-canvas {
+	transform: scaleX(-1);
+}
+
+.chat-pet-button[data-state='sing'] .chat-pet-sprite > .chat-pet-canvas {
+	transform: none;
+}
+
+.chat-pet-eye-accessory {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	display: block;
+	width: 48px;
+	height: 48px;
+	overflow: hidden;
+	image-rendering: pixelated;
+	pointer-events: none;
+}
+
+.chat-pet-eye-accessory-canvas {
+	display: block;
+	height: 48px;
+	image-rendering: pixelated;
+	pointer-events: none;
+}
+
+.chat-pet-eyes {
+	color: #191a1b;
+	position: absolute;
+	inset: 0;
+	visibility: hidden;
+	pointer-events: none;
+}
+
+.chat-pet-eyes.tracking,
+.chat-pet-eyes.blinking {
+	visibility: visible;
+}
+
+.chat-pet-eyes.bobbed {
+	transform: translateY(2px);
+}
+
+.chat-pet-eye {
+	position: absolute;
+	top: 30px;
+	width: 8px;
+	height: 8px;
+	overflow: hidden;
+}
+
+.chat-pet-eye.left { left: 18px; }
+.chat-pet-eye.right { left: 30px; }
+
+.chat-pet-button[data-facing='left'] .chat-pet-eye.left { left: 22px; }
+.chat-pet-button[data-facing='left'] .chat-pet-eye.right { left: 10px; }
+
+.chat-pet-pupil {
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	width: 4px;
+	height: 4px;
+	background: currentColor;
+}
+
+.chat-pet-button[data-state='idle'] .chat-pet-eye,
+.chat-pet-button[data-state='rendering'] .chat-pet-eye,
+.chat-pet-button[data-state='achievementUnlocked'] .chat-pet-eye,
+.chat-pet-button[data-state='clapping'] .chat-pet-eye,
+.chat-pet-button[data-state='yapping'] .chat-pet-eye,
+.chat-pet-button[data-state='typing'] .chat-pet-eye,
+.chat-pet-button[data-state='painting'] .chat-pet-eye,
+.chat-pet-button[data-state='buttonPress'] .chat-pet-eye {
+	height: 12px;
+}
+
+.chat-pet-button[data-state='idle'] .chat-pet-pupil,
+.chat-pet-button[data-state='rendering'] .chat-pet-pupil,
+.chat-pet-button[data-state='achievementUnlocked'] .chat-pet-pupil,
+.chat-pet-button[data-state='clapping'] .chat-pet-pupil,
+.chat-pet-button[data-state='yapping'] .chat-pet-pupil,
+.chat-pet-button[data-state='typing'] .chat-pet-pupil,
+.chat-pet-button[data-state='painting'] .chat-pet-pupil,
+.chat-pet-button[data-state='buttonPress'] .chat-pet-pupil {
+	height: 8px;
+}
+
+.chat-pet-button[data-state='love'] .chat-pet-eye { top: 31px; height: 11px; }
+.chat-pet-button[data-state='love'] .chat-pet-pupil { height: 7px; }
+
+.chat-pet-eyes.blink .chat-pet-pupil {
+	animation: chat-pet-eye-blink 260ms steps(1, end);
+}
+
+.chat-pet-button[data-state='idle'] .chat-pet-eyes.blink .chat-pet-pupil,
+.chat-pet-button[data-state='rendering'] .chat-pet-eyes.blink .chat-pet-pupil,
+.chat-pet-button[data-state='achievementUnlocked'] .chat-pet-eyes.blink .chat-pet-pupil,
+.chat-pet-button[data-state='clapping'] .chat-pet-eyes.blink .chat-pet-pupil,
+.chat-pet-button[data-state='yapping'] .chat-pet-eyes.blink .chat-pet-pupil,
+.chat-pet-button[data-state='typing'] .chat-pet-eyes.blink .chat-pet-pupil,
+.chat-pet-button[data-state='painting'] .chat-pet-eyes.blink .chat-pet-pupil,
+.chat-pet-button[data-state='buttonPress'] .chat-pet-eyes.blink .chat-pet-pupil,
+.chat-pet-button[data-state='love'] .chat-pet-eyes.blink .chat-pet-pupil {
+	animation-name: chat-pet-tall-eye-blink;
+}
+
+.chat-pet-button.dragging .chat-pet-pupil {
+	visibility: hidden;
+}
+
+.chat-pet-button.dragging .chat-pet-eye::before,
+.chat-pet-button.dragging .chat-pet-eye::after {
+	content: '';
+	position: absolute;
+	top: 5px;
+	left: 0;
+	width: 8px;
+	height: 2px;
+	background: currentColor;
+}
+
+.chat-pet-button.dragging .chat-pet-eye::before { transform: rotate(45deg); }
+.chat-pet-button.dragging .chat-pet-eye::after { transform: rotate(-45deg); }
+
+.chat-pet-speech-bubble {
+	position: absolute;
+	left: 4px;
+	top: -32px;
+	display: block;
+	width: 72px;
+	height: 72px;
+	overflow: hidden;
+	image-rendering: pixelated;
+	pointer-events: none;
+}
+
+.chat-pet-speech-canvas { width: 72px; height: 72px; }
+
+.chat-pet-button[data-state='rendering'].speech-bubble-left .chat-pet-speech-bubble {
+	left: -28px;
+	transform: scaleX(-1);
+}
+
+.chat-pet-button.dragging .chat-pet-speech-bubble,
+.chat-pet-button.throwing .chat-pet-speech-bubble { display: none; }
+
+.chat-pet-respawn-effect {
+	position: absolute;
+	width: 48px;
+	height: 48px;
+	image-rendering: pixelated;
+	pointer-events: none;
+}
+
+.chat-pet-button[data-state='complete'] .chat-pet-sprite,
+.chat-pet-button[data-state='complete'] .chat-pet-eye-accessory {
+	transform-origin: 50% 60%;
+	animation: chat-pet-complete-motion 960ms steps(1, end);
+}
+
+.chat-pet-button[data-state='yapping'] .chat-pet-sprite,
+.chat-pet-button[data-state='yapping'] .chat-pet-eyes,
+.chat-pet-button[data-state='yapping'] .chat-pet-eye-accessory {
+	transform-origin: 30% 80%;
+	animation: chat-pet-yapping-fall 480ms steps(4, end) forwards;
+}
+
+.chat-pet-button[data-state='yappingMouthOpen'] .chat-pet-sprite,
+.chat-pet-button[data-state='yappingMouthOpen'] .chat-pet-eye-accessory {
+	transform-origin: 30% 80%;
+	transform: translateY(-4px) rotate(-90deg);
+}
+
+.chat-pet-button.on-the-run {
+	transform: translateY(40px);
+	z-index: auto;
+	transition: transform 320ms ease-out;
+}
+
+.chat-pet-button.on-the-run.peeking {
+	transform: translateY(10px);
+}
+
+.chat-pet-button.returning-from-run { z-index: auto; }
+
+.chat-pet-button.dragging .chat-pet-sprite,
+.chat-pet-button.dragging .chat-pet-eyes,
+.chat-pet-button.dragging .chat-pet-eye-accessory {
+	transform: none;
+	animation: none;
+}
+
+.chat-pet-bounce-counter {
+	position: absolute;
+	z-index: 2;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	box-sizing: border-box;
+	min-width: 24px;
+	height: 24px;
+	padding: 0 6px;
+	border-radius: 999px;
+	background: var(--dsw-alias-brand-primary);
+	color: #fff;
+	font-size: 11px;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	line-height: 1;
+	pointer-events: none;
+	transform: translate(-25%, -50%);
+}
+
+.chat-pet-confetti-anchor {
+	position: absolute;
+	pointer-events: none;
+}
+
+.chat-pet-confetti {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	width: 4px;
+	height: 4px;
+	animation: chat-pet-confetti 900ms ease-out var(--delay, 0ms) forwards;
+}
+
+@keyframes chat-pet-confetti {
+	0% { transform: translate(0, 0) rotate(0); opacity: 1; }
+	100% { transform: translate(var(--dx), var(--dy)) rotate(240deg); opacity: 0; }
+}
+
+@keyframes chat-pet-drag-resist {
+	0%, 100% { transform: translateX(-2px) rotate(-2deg); }
+	50% { transform: translateX(2px) rotate(2deg); }
+}
+
+@keyframes chat-pet-drag-soft-resist {
+	0%, 100% { transform: translateX(-1px) rotate(-1deg); }
+	50% { transform: translateX(1px) rotate(1deg); }
+}
+
+@keyframes chat-pet-complete-motion {
+	0% { transform: translateY(0) rotate(0); }
+	14.2857% { transform: translateY(-4px) rotate(51deg); }
+	28.5714% { transform: translateY(-8px) rotate(103deg); }
+	42.8571% { transform: translateY(-8px) rotate(154deg); }
+	57.1429% { transform: translateY(-8px) rotate(206deg); }
+	71.4286% { transform: translateY(-8px) rotate(257deg); }
+	85.7143% { transform: translateY(-4px) rotate(309deg); }
+	100% { transform: translateY(0) rotate(360deg); }
+}
+
+@keyframes chat-pet-yapping-fall {
+	0% { transform: translateY(0) rotate(0); }
+	100% { transform: translateY(-4px) rotate(-90deg); }
+}
+
+@keyframes chat-pet-eye-blink {
+	0%, 11.537%, 88.462%, 100% { clip-path: inset(0); }
+	11.538%, 88.461% { clip-path: inset(1px 0); }
+}
+
+@keyframes chat-pet-tall-eye-blink {
+	0%, 11.537%, 88.462%, 100% { clip-path: inset(0); }
+	11.538%, 88.461% { clip-path: inset(3px 0); }
+}
+
+/* ------------------------------------------------------------------ menu */
+
+.chat-pet-menu {
+	position: fixed;
+	z-index: 70;
+	display: flex;
+	flex-direction: column;
+	width: 190px;
+	padding: 6px;
+	border: 1px solid var(--dsw-alias-border-l1);
+	border-radius: 10px;
+	background: var(--dsw-alias-bg-overlay);
+	box-shadow: 0 12px 30px rgba(0, 0, 0, 0.32);
+	pointer-events: auto;
+}
+
+.chat-pet-menu-item {
+	display: flex;
+	align-items: center;
+	width: 100%;
+	height: 30px;
+	padding: 0 9px;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--dsw-alias-label-primary);
+	font: inherit;
+	font-size: 12px;
+	text-align: left;
+	cursor: pointer;
+}
+
+.chat-pet-menu-item:hover:not(:disabled),
+.chat-pet-menu-item:focus-visible:not(:disabled) {
+	outline: none;
+	background: var(--dsw-alias-bg-layer-2);
+}
+
+.chat-pet-menu-item:disabled {
+	opacity: 0.45;
+	cursor: default;
+}
+
+.chat-pet-menu-separator {
+	height: 1px;
+	margin: 4px 6px;
+	background: var(--dsw-alias-border-l1);
+}
+
+/* ----------------------------------------------------------------- panel */
+
+.chat-pet-panel-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 65;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 16px;
+	background: rgba(0, 0, 0, 0.32);
+	pointer-events: auto;
+}
+
+.chat-pet-panel {
+	display: flex;
+	flex-direction: column;
+	width: min(620px, calc(100vw - 32px));
+	max-height: min(70vh, 720px);
+	border: 1px solid var(--dsw-alias-border-l1);
+	border-radius: 14px;
+	background: var(--dsw-alias-bg-overlay);
+	box-shadow: 0 18px 48px rgba(0, 0, 0, 0.4);
+	overflow: hidden;
+}
+
+.chat-pet-panel-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 12px 8px;
+	border-bottom: 1px solid var(--dsw-alias-border-l1);
+}
+
+.chat-pet-panel-tabs {
+	display: flex;
+	gap: 4px;
+	flex: 1;
+}
+
+.chat-pet-panel-tab {
+	height: 28px;
+	padding: 0 12px;
+	border: 1px solid transparent;
+	border-radius: 7px;
+	background: transparent;
+	color: var(--dsw-alias-label-secondary);
+	font: inherit;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.chat-pet-panel-tab[aria-selected='true'] {
+	border-color: var(--dsw-alias-border-l2);
+	background: var(--dsw-alias-bg-layer-2);
+	color: var(--dsw-alias-label-primary);
+}
+
+.chat-pet-panel-close {
+	width: 28px;
+	height: 28px;
+	border: 0;
+	border-radius: 7px;
+	background: transparent;
+	color: var(--dsw-alias-label-secondary);
+	font-size: 18px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.chat-pet-panel-close:hover {
+	background: var(--dsw-alias-bg-layer-2);
+	color: var(--dsw-alias-label-primary);
+}
+
+.chat-pet-panel-body {
+	padding: 14px 16px 18px;
+	overflow: auto;
+}
+
+.chat-pet-achievements-content h1,
+.chat-pet-colors-content h1 {
+	margin: 0 0 4px;
+	font-size: 18px;
+	font-weight: 600;
+	color: var(--dsw-alias-label-primary);
+}
+
+.chat-pet-achievements-intro {
+	margin: 0 0 14px;
+	color: var(--dsw-alias-label-secondary);
+	font-size: 12px;
+	line-height: 1.5;
+}
+
+.chat-pet-achievements-collection-header {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	margin-bottom: 8px;
+}
+
+.chat-pet-achievements-collection-header h2 {
+	margin: 0;
+	font-size: 14px;
+	color: var(--dsw-alias-label-primary);
+}
+
+.chat-pet-achievements-count {
+	color: var(--dsw-alias-label-tertiary);
+	font-size: 11px;
+}
+
+.chat-pet-achievements-list {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	align-items: stretch;
+	gap: 8px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.chat-pet-achievements-list-item {
+	display: flex;
+	min-height: 0;
+}
+
+.chat-pet-achievement-card {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	box-sizing: border-box;
+	width: 100%;
+	height: 100%;
+	min-height: 180px;
+	padding: 0;
+	border: 1px solid var(--dsw-alias-border-l1);
+	border-radius: 10px;
+	background: var(--dsw-alias-bg-layer-1);
+	color: var(--dsw-alias-label-primary);
+	text-align: left;
+	cursor: pointer;
+	overflow: hidden;
+}
+
+.chat-pet-achievement-card:hover:not(:disabled) {
+	border-color: var(--dsw-alias-border-l2);
+}
+
+.chat-pet-achievement-card.wearing {
+	border-color: var(--dsw-alias-brand-primary);
+	background: var(--dsw-alias-bg-layer-2);
+}
+
+.chat-pet-achievement-card.locked {
+	cursor: default;
+}
+
+.chat-pet-achievement-card:disabled {
+	opacity: 1;
+}
+
+.chat-pet-achievement-previews {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 72px;
+	background: var(--dsw-alias-bg-layer-2);
+}
+
+.chat-pet-achievement-preview {
+	width: 56px;
+	height: 56px;
+	image-rendering: pixelated;
+}
+
+.chat-pet-achievement-card-content {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	padding: 8px 10px 10px;
+}
+
+.chat-pet-achievement-card-content h3 {
+	margin: 0;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.chat-pet-achievement-state {
+	color: var(--dsw-alias-brand-primary);
+	font-size: 10px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.chat-pet-achievement-description,
+.chat-pet-achievement-reward {
+	margin: 0;
+	color: var(--dsw-alias-label-secondary);
+	font-size: 11px;
+	line-height: 1.4;
+}
+
+.chat-pet-achievement-reward {
+	color: var(--dsw-alias-label-tertiary);
+}
+
+.chat-pet-achievement-new-badge {
+	align-self: flex-start;
+	padding: 1px 5px;
+	border-radius: 999px;
+	background: var(--dsw-alias-brand-primary);
+	color: #fff;
+	font-size: 9px;
+	font-weight: 700;
+	text-transform: uppercase;
+}
+
+.chat-pet-achievement-roadmap {
+	cursor: default;
+	border-style: dashed;
+	opacity: 0.8;
+}
+
+.chat-pet-achievement-roadmap-preview {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 72px;
+	background: var(--dsw-alias-bg-layer-2);
+	color: var(--dsw-alias-label-tertiary);
+	font-size: 12px;
+}
+
+.chat-pet-achievements-experimental {
+	margin: 14px 0 0;
+	color: var(--dsw-alias-label-tertiary);
+	font-size: 11px;
+}
+
+/* ----------------------------------------------------------------- color */
+
+.chat-pet-colors-list {
+	display: grid;
+	grid-template-columns: repeat(5, minmax(0, 1fr));
+	gap: 8px;
+	margin: 0 0 14px;
+	padding: 0;
+	list-style: none;
+}
+
+.chat-pet-color-card {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+	width: 100%;
+	padding: 8px 4px 6px;
+	border: 1px solid var(--dsw-alias-border-l1);
+	border-radius: 9px;
+	background: var(--dsw-alias-bg-layer-1);
+	color: var(--dsw-alias-label-primary);
+	cursor: pointer;
+}
+
+.chat-pet-color-card.wearing {
+	border-color: var(--dsw-alias-brand-primary);
+	background: var(--dsw-alias-bg-layer-2);
+}
+
+.chat-pet-color-card.locked {
+	cursor: default;
+	opacity: 0.55;
+}
+
+.chat-pet-color-preview {
+	width: 48px;
+	height: 48px;
+	image-rendering: pixelated;
+}
+
+.chat-pet-color-label {
+	font-size: 10px;
+}
+
+.chat-pet-color-state {
+	color: var(--dsw-alias-label-tertiary);
+	font-size: 9px;
+}
+
+.chat-pet-colors-unlock-hint {
+	margin: 0 0 12px;
+	padding: 8px 10px;
+	border-radius: 8px;
+	background: var(--dsw-alias-bg-layer-2);
+	color: var(--dsw-alias-label-secondary);
+	font-size: 11px;
+}
+
+.chat-pet-custom-color h2 {
+	margin: 0 0 2px;
+	font-size: 14px;
+}
+
+.chat-pet-custom-color p {
+	margin: 0 0 8px;
+	color: var(--dsw-alias-label-secondary);
+	font-size: 11px;
+}
+
+.chat-pet-custom-color-body {
+	display: flex;
+	gap: 12px;
+	align-items: flex-start;
+}
+
+.chat-pet-custom-color-controls {
+	flex: 1;
+	min-width: 0;
+}
+
+.chat-pet-custom-color-inputs {
+	display: flex;
+	gap: 6px;
+	align-items: center;
+}
+
+.chat-pet-custom-color-inputs input[type='color'] {
+	width: 34px;
+	height: 28px;
+	padding: 0;
+	border: 1px solid var(--dsw-alias-border-l1);
+	border-radius: 6px;
+	background: transparent;
+	cursor: pointer;
+}
+
+.chat-pet-hex {
+	flex: 1;
+	min-width: 0;
+	height: 28px;
+	padding: 0 7px;
+	border: 1px solid var(--dsw-alias-border-l1);
+	border-radius: 6px;
+	background: var(--dsw-alias-bg-layer-1);
+	color: var(--dsw-alias-label-primary);
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: 11px;
+}
+
+.chat-pet-hex.is-invalid {
+	border-color: var(--dsw-alias-state-error-primary);
+}
+
+.chat-pet-action {
+	height: 28px;
+	padding: 0 10px;
+	border: 1px solid var(--dsw-alias-border-l1);
+	border-radius: 6px;
+	background: var(--dsw-alias-bg-layer-1);
+	color: var(--dsw-alias-label-primary);
+	font: inherit;
+	font-size: 11px;
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+.chat-pet-action:hover:not(:disabled) { border-color: var(--dsw-alias-border-l2); }
+.chat-pet-action:disabled { opacity: 0.45; cursor: default; }
+
+.chat-pet-color-validation {
+	min-height: 16px;
+	margin: 4px 0 0;
+	color: var(--dsw-alias-state-error-primary);
+	font-size: 10px;
+}
+
+/* ------------------------------------------------------------ jump game */
+
+.chat-pet-jump-effects {
+	position: fixed;
+	inset: 0;
+	z-index: 50;
+	pointer-events: none;
+}
+
+.chat-pet-jump-backdrop {
+	position: absolute;
+	background: var(--dsw-alias-bg-base);
+}
+
+.chat-pet-jump-stage {
+	position: absolute;
+	overflow: hidden;
+	pointer-events: none;
+}
+
+.chat-pet-jump-platform {
+	position: absolute;
+	height: 4px;
+	box-sizing: content-box;
+	padding-inline: 4px;
+	border-radius: 999px;
+	background: var(--dsw-alias-label-tertiary);
+	transform: translate(-50%, -50%);
+}
+
+.chat-pet-jump-platform.moving::before,
+.chat-pet-jump-platform.moving::after {
+	content: '';
+	position: absolute;
+	top: 8px;
+	width: 4px;
+	height: 4px;
+	border: solid var(--dsw-alias-label-tertiary);
+	border-width: 0 1px 1px 0;
+}
+
+.chat-pet-jump-platform.moving::before { left: calc(50% - 8px); transform: rotate(135deg); }
+.chat-pet-jump-platform.moving::after { right: calc(50% - 8px); transform: rotate(-45deg); }
+
+.chat-pet-jump-platform.crumbling {
+	background: repeating-linear-gradient(to right, var(--dsw-alias-label-tertiary) 0 8px, transparent 8px 12px);
+}
+
+.chat-pet-jump-platform-integrity {
+	display: none;
+	position: absolute;
+	top: 8px;
+	left: 0;
+	width: 100%;
+	height: 2px;
+	background: var(--dsw-alias-label-primary);
+	transform-origin: left;
+}
+
+.chat-pet-jump-platform.crumbling-active .chat-pet-jump-platform-integrity {
+	display: block;
+}
+
+.chat-pet-jump-wall {
+	position: absolute;
+	box-sizing: border-box;
+	border-radius: 999px;
+	background: var(--dsw-alias-label-tertiary);
+}
+
+.chat-pet-jump-score {
+	position: absolute;
+	top: 16px;
+	right: 16px;
+	left: 16px;
+	text-align: right;
+	color: var(--dsw-alias-label-primary);
+	font-size: 14px;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	line-height: 1.5;
+}
+
+.chat-pet-jump-high-score {
+	color: var(--dsw-alias-label-tertiary);
+	font-size: 12px;
+	font-weight: 400;
+}
+
+.chat-pet-jump-charge {
+	position: absolute;
+	width: 76px;
+	height: 20px;
+	background: var(--dsw-alias-label-primary);
+	clip-path: polygon(4px 0, 72px 0, 72px 4px, 76px 4px, 76px 16px, 72px 16px, 72px 20px, 4px 20px, 4px 16px, 0 16px, 0 4px, 4px 4px);
+}
+
+.chat-pet-jump-charge-track {
+	position: absolute;
+	inset: 4px;
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 0 4px;
+	background: var(--dsw-alias-bg-base);
+}
+
+.chat-pet-jump-charge-cell {
+	width: 4px;
+	height: 8px;
+	flex-shrink: 0;
+	background: var(--dsw-alias-label-tertiary);
+	opacity: 0.25;
+}
+
+.chat-pet-jump-charge-cell.filled {
+	background: var(--dsw-alias-brand-primary);
+	opacity: 1;
+}
+
+.chat-pet-jump-charge.full .chat-pet-jump-charge-cell {
+	background: #e6c94d;
+}
+
+.chat-pet-jump-hint {
+	position: absolute;
+	bottom: 16px;
+	left: 16px;
+	right: 16px;
+	color: var(--dsw-alias-label-tertiary);
+	font-size: 12px;
+	line-height: 1.5;
+	text-align: center;
+}
+
+.chat-pet-jump-effects.keyboard-focused .chat-pet-jump-charge {
+	background: var(--dsw-alias-brand-primary);
+}
+
+.chat-pet-button.jump-game-pet {
+	z-index: 55;
+	cursor: pointer;
+	transition: none;
+}
+
+/* ------------------------------------------------------------- motion */
+
+@media (prefers-reduced-motion: reduce) {
+	.chat-pet-button,
+	.chat-pet-button.dragging.soft-resisting,
+	.chat-pet-button.dragging.resisting,
+	.chat-pet-button[data-state='complete'] .chat-pet-sprite,
+	.chat-pet-button[data-state='complete'] .chat-pet-eye-accessory,
+	.chat-pet-button[data-state='yapping'] .chat-pet-sprite,
+	.chat-pet-button[data-state='yapping'] .chat-pet-eye-accessory,
+	.chat-pet-eyes,
+	.chat-pet-pupil,
+	.chat-pet-confetti {
+		animation: none !important;
+		transition: none !important;
+	}
+}

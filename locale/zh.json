@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Blobby",
+    "description": "根据 VS Code 官方 Blobby（chat-pet）的逻辑与素材实现的 DSH 插件：官方雪碧图、帽子、自定义颜色、聊天反应、拖拽投掷、成就与跳跳乐。原项目：https://github.com/microsoft/vscode/tree/main/src/vs/workbench/contrib/chat/browser/widget/media/chatPet"
+  }
+}

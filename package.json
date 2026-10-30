@@ -1,0 +1,67 @@
+{
+  "name": "vscode-pet",
+  "version": "1.0.0",
+  "type": "module",
+  "license": "MIT",
+  "icon": "./icon.svg",
+  "description": "An unofficial DSH port of VS Code's Blobby chat pet, built from its logic and sprite assets.",
+  "homepage": "https://github.com/96274zxc/vscode-pet",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/96274zxc/vscode-pet.git"
+  },
+  "bugs": {
+    "url": "https://github.com/96274zxc/vscode-pet/issues"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "blobby",
+    "vscode-pet",
+    "desktop-pet"
+  ],
+  "engines": {
+    "dsh": ">=0.2.1-rc.1"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./icon.png": "./icon.png",
+    "./icons/*": "./icons/*"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "icon.png",
+    "icons/*.png",
+    "README.md",
+    "NOTICE.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "fetch-assets": "node scripts/fetch-assets.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    }
+  }
+}
