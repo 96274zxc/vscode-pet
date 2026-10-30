@@ -98,7 +98,12 @@ function ChatPetMenu(props) {
 		// A menu anchored to the old window size looks detached after a resize
 		// (for example when the user maximizes the DSH window); close it instead
 		// of leaving it at a stale position.
-		const onResize = () => onClose()
+		const width = window.innerWidth
+		const height = window.innerHeight
+		const onResize = () => {
+			if (window.innerWidth === width && window.innerHeight === height) return
+			onClose()
+		}
 		window.addEventListener('resize', onResize)
 		return () => window.removeEventListener('resize', onResize)
 	}, [menu, onClose])
@@ -145,6 +150,32 @@ function ChatPetMenu(props) {
 		onClick: () => { onClose(); onClick() },
 	}, label)
 	const jumpEnabled = !controller.dead && !controller.airborne && !controller.onTheRun
+	const sizeControl = h('div', { key: 'size', className: 'chat-pet-menu-size' }, [
+		h('button', {
+			key: 'shrink',
+			type: 'button',
+			className: 'chat-pet-menu-size-step',
+			disabled: controller.scale <= CHAT_PET_MIN_SCALE,
+			'aria-label': t('menu.shrink'),
+			title: t('menu.shrink'),
+			onClick: () => controller.shrink(),
+		}, '\u2212'),
+		h('button', {
+			key: 'reset',
+			type: 'button',
+			className: 'chat-pet-menu-size-reset',
+			disabled: Math.abs(controller.scale - 1) < 0.001,
+			onClick: () => controller.resetSize(),
+		}, t('menu.resetSize')),
+		h('button', {
+			key: 'grow',
+			type: 'button',
+			className: 'chat-pet-menu-size-step',
+			'aria-label': t('menu.grow'),
+			title: t('menu.grow'),
+			onClick: () => controller.grow(),
+		}, '+'),
+	])
 	return h('div', {
 		ref,
 		className: 'chat-pet-menu',
@@ -156,9 +187,7 @@ function ChatPetMenu(props) {
 		item('jump', t('menu.playJump'), jumpEnabled, () => controller.startJumpGame()),
 		item('run', controller.onTheRun ? t('menu.comeBack') : t('menu.goOnTheRun'), true, () => controller.setOnTheRun(!controller.onTheRun)),
 		h('div', { key: 'sep1', className: 'chat-pet-menu-separator' }),
-		item('grow', t('menu.grow'), true, () => controller.grow()),
-		item('shrink', t('menu.shrink'), controller.scale > CHAT_PET_MIN_SCALE, () => controller.shrink()),
-		item('reset', t('menu.resetSize'), controller.scale !== 1, () => controller.resetSize()),
+		sizeControl,
 		h('div', { key: 'sep2', className: 'chat-pet-menu-separator' }),
 		item('color', t('menu.changeColor'), true, () => controller.host.openPanel('color')),
 	])
@@ -485,10 +514,22 @@ function PetSlot(props) {
 	const pending = Boolean(sessionStatus?.pendingInteraction)
 	const draft = props.input && typeof props.input.draft === 'string' ? props.input.draft : ''
 	const hasInput = draft.trim().length > 0
+	const draftRef = React.useRef(draft)
+	const inputRevisionRef = React.useRef(0)
+	if (draftRef.current !== draft) {
+		draftRef.current = draft
+		inputRevisionRef.current += 1
+	}
 	const controller = controllerRef.current
 	React.useEffect(() => {
-		controllerRef.current?.setFacts({ running, pendingInteraction: pending, hasInput, canceled: props.session?.canceled === true })
-	}, [running, pending, hasInput, props.session?.canceled])
+		controllerRef.current?.setFacts({
+			running,
+			pendingInteraction: pending,
+			hasInput,
+			inputRevision: inputRevisionRef.current,
+			canceled: props.session?.canceled === true,
+		})
+	}, [running, pending, hasInput, draft, props.session?.canceled])
 
 	React.useEffect(() => {
 		if (!target) return

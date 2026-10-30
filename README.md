@@ -34,8 +34,8 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   the despawn/respawn portal sequence. The composer card is its only perch: it spawns and respawns
   above that card, follows it when the window or input grows/shrinks, bounces off the side walls,
   and its respawn drop is capped above the composer instead of falling from the top of the chat.
-- Right-click for **Hats**, **Play Jump Game**, **Go on the Run / Come Back**,
-  **Grow / Shrink / Reset Size** and **Change Color**.
+- Right-click for **Hats**, **Play Jump Game**, **Go on the Run / Come Back**, an inline
+  **− / Reset Size / +** size control, and **Change Color**.
 - 13 hats from the official catalog plus the **Color Customization** custom-color entry, laid out with the
   DSH-only **No Hat** option as a 3-column, 15-card grid. The counter keeps VS Code's "14 of 14
   unlocked" wording; only the 13 hats and Color Customization are counted. The DSH port does not track

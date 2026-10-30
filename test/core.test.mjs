@@ -48,6 +48,7 @@ test('rendered state lets yapping yield and dragging win', () => {
 	assert.equal(t.getChatPetRenderedState('rendering', 'love', false), 'love')
 	assert.equal(t.getChatPetRenderedState('rendering', 'love', true), 'idle')
 	assert.equal(t.getChatPetRenderedState('sleep', undefined, false), 'sleep')
+	assert.equal(t.getChatPetRenderedState('typing', 'waking', false), 'waking')
 })
 
 test('click interactions: 1% rare, 1% yapping, no immediate repeat', () => {
@@ -162,6 +163,7 @@ test('dizzy triggers after eight quick gaze direction changes', () => {
 
 test('eye accessories follow gaze only while Blobby tracks the cursor', () => {
 	assert.equal(t.doesChatPetStateTrackCursor('idle'), true)
+	assert.equal(t.doesChatPetStateTrackCursor('typing'), false)
 	assert.equal(t.doesChatPetStateTrackCursor('sleep'), false)
 	assert.equal(t.doesChatPetStateTrackCursor('waking'), false)
 	assert.equal(t.getChatPetEyeAccessoryGazeOffsetForState('sleep', [1, 0]), undefined)

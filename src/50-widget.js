@@ -36,6 +36,8 @@ class ChatPetController {
 		this.running = false
 		this.pending = false
 		this.hasInput = false
+		this.inputRevision = 0
+		this._lastInputRevision = 0
 		this.idleExpired = false
 		this.confirmationExpired = false
 		this.transientState = undefined
@@ -277,7 +279,7 @@ class ChatPetController {
 
 	/* --------------------------------------------------------------- layout */
 
-	layout() {
+	layout(preserveTop = false) {
 		if (this.disposed) return
 		if (!this.visible) {
 			this.root.style.display = 'none'
@@ -307,6 +309,8 @@ class ChatPetController {
 		this.displaySize = CHAT_PET_DISPLAY_SIZE * this.scale
 		this.button.style.width = `${this.displaySize}px`
 		this.button.style.height = `${this.displaySize}px`
+		this.button.style.setProperty('--chat-pet-run-hide', `${this.displaySize * (40 / 48)}px`)
+		this.button.style.setProperty('--chat-pet-run-peek', `${this.displaySize * (10 / 48)}px`)
 		this.visual.style.width = `${CHAT_PET_DISPLAY_SIZE}px`
 		this.visual.style.height = `${CHAT_PET_DISPLAY_SIZE}px`
 		this.visual.style.transform = `scale(${this.scale})`
@@ -332,7 +336,7 @@ class ChatPetController {
 			left = getChatPetHorizontalPosition(this._left ?? minimumLeft, minimumLeft, maximumLeft)
 		}
 		this._left = left
-		this._top = this._restingTop()
+		if (!preserveTop || this._top === undefined) this._top = this._restingTop()
 		setButtonPosition(this.button, this._left, this._top)
 		this._updateWideLayers()
 	}
@@ -401,9 +405,14 @@ class ChatPetController {
 		const wasRunning = this.running
 		const wasPending = this.pending
 		const hadInput = this.hasInput
+		const nextInputRevision = typeof facts.inputRevision === 'number' ? facts.inputRevision : undefined
+		const inputChanged = nextInputRevision !== undefined
+			? nextInputRevision !== this._lastInputRevision
+			: facts.hasInput === true && !hadInput
 		this.running = facts.running === true
 		this.pending = facts.pendingInteraction === true
 		this.hasInput = facts.hasInput === true
+		if (nextInputRevision !== undefined) this._lastInputRevision = nextInputRevision
 		if (this.pending && !wasPending) {
 			this.confirmationExpired = false
 			this._scheduleConfirmation()
@@ -419,7 +428,9 @@ class ChatPetController {
 		if (wasRunning && !this.running && !facts.canceled) {
 			this._showTransientState('buttonPress', false)
 		}
-		if (this.hasInput && !hadInput) {
+		if (inputChanged && !this.onTheRun) {
+			// Every keystroke is a fresh wake signal, even when the input was
+			// already non-empty and the pet had fallen asleep while it sat there.
 			this._wake()
 			this._resetIdle()
 		}
@@ -707,10 +718,11 @@ class ChatPetController {
 		this.eyes.classList.toggle('blinking', blinking)
 		this.eyes.classList.toggle('bobbed', !this._motionReduced && (state === 'idle' || state === 'rendering' || state === 'achievementUnlocked') && frame >= 20)
 		this._blink.setEnabled(!this._motionReduced && !this._jumpGame && (tracks || blinking))
+		if (!tracks) this._gaze = [0, 0]
 		if (blinking) {
 			this._gaze = [0, 0]
-			this._applyGaze()
 		}
+		this._applyGaze()
 		this.eyes.style.color = getChatPetEyeColor(this.color)
 	}
 
@@ -825,7 +837,8 @@ class ChatPetController {
 			const rect = this.button.getBoundingClientRect()
 			const centerX = rect.left + rect.width / 2
 			const centerY = rect.top + rect.height / 2
-			const next = getChatPetGazeDirection(this._cursor.x, this._cursor.y, centerX, centerY)
+			const tracks = doesChatPetStateTrackCursor(this.renderedState ?? 'idle')
+			const next = tracks ? getChatPetGazeDirection(this._cursor.x, this._cursor.y, centerX, centerY) : [0, 0]
 			const facing = this._facing.update(this._cursor.x, centerX)
 			if (facing !== this._lastFacing) {
 				this._lastFacing = facing
@@ -847,8 +860,9 @@ class ChatPetController {
 	}
 
 	_applyGaze() {
-		const x = this._gaze[0] * 2
-		const y = this._gaze[1] * 2
+		const tracks = doesChatPetStateTrackCursor(this.renderedState ?? 'idle')
+		const x = tracks ? this._gaze[0] * 2 : 0
+		const y = tracks ? this._gaze[1] * 2 : 0
 		for (const pupil of this.pupils) pupil.style.transform = x === 0 && y === 0 ? '' : `translate(${x}px, ${y}px)`
 	}
 
@@ -1404,8 +1418,15 @@ class ChatPetController {
 		this.transientState = undefined
 		clearInterval(this._runTimer)
 		this._runTimer = undefined
+		if (this.airborne) {
+			this.airborne = false
+			this._throw = undefined
+			this.button.classList.remove('throwing', 'falling')
+		}
 		this.button.classList.toggle('on-the-run', value)
 		this.button.classList.remove('peeking')
+		if (value) this._forgetHorizontalPosition()
+		this.layout()
 		if (value) {
 			this._clearIdle()
 			this._startRunTimer()
@@ -1429,6 +1450,7 @@ class ChatPetController {
 	applyPrefs() {
 		const prefs = chatPetPrefs.get()
 		const oldVariant = this.variant
+		const previousScale = this.scale
 		const wasVisible = this.visible
 		this.prefs = prefs
 		this.scale = prefs.scale
@@ -1445,7 +1467,12 @@ class ChatPetController {
 			this.setVisible(true)
 			return
 		}
-		this.layout()
+		const shrunk = this.scale < previousScale
+		const canFallFromShrink = shrunk && !this.onTheRun && !this.dead && !this.airborne
+			&& !this.dragging && !this._jumpGame && !this._motionReduced
+		// Keep the old top while shrinking so the smaller pet starts above the
+		// input and falls onto it, matching VS Code's shrink reaction.
+		this.layout(canFallFromShrink)
 		if (oldVariant !== this.variant) {
 			this._preload()
 			this._renderState(this.renderedState ?? 'idle', true)
@@ -1454,6 +1481,7 @@ class ChatPetController {
 		}
 		if (accessoryChanged) this._updateEyeAccessory(this.renderedState ?? 'idle', this.activeFrameIndex)
 		this._updateEyes(this.renderedState ?? 'idle', this.activeFrameIndex)
+		if (canFallFromShrink) this._beginFall()
 	}
 
 	selectAccessory(id) {
