@@ -1,5 +1,7 @@
 # Blobby — VS Code Pet for DSH
 
+**English** | [简体中文](README.zh.md)
+
 Blobby is the official VS Code chat pet, ported to the DeepSeek Harness Web composer. It uses the
 official sprite sheets, accessories, frame timings, physics and interaction rules from
 `microsoft/vscode`, not a look-alike.

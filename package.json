@@ -43,6 +43,7 @@
     "icon.png",
     "icons/*.png",
     "README.md",
+    "README.zh.md",
     "NOTICE.md",
     "LICENSE"
   ],
