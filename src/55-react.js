@@ -131,23 +131,27 @@ function ChatPetMenu(props) {
 }
 
 function HatsPanel(props) {
-	const { controller, t } = props
+	const { controller, onTab, t } = props
 	const prefs = useBlobbyPrefs()
 	const variant = getChatPetColorVariant(prefs.color)
 	const hats = CHAT_PET_ACHIEVEMENTS
 		.filter(achievement => achievement.accessory)
 		.map(achievement => getChatPetAccessoryById(achievement.accessory))
 		.filter(Boolean)
+	// VS Code counts the 13 hats plus the True Name color item as 14 entries;
+	// the extra "No Hat" card is a DSH-only option and is not counted.
+	const unlockedCount = CHAT_PET_ACHIEVEMENTS.length
 	const select = accessoryId => controller.selectAccessory(accessoryId)
 	const card = accessory => {
 		const wearing = prefs.accessory === accessory.id
-		const stateLabel = wearing ? t('achievements.wearing') : t('achievements.select')
 		return h('li', { key: accessory.id, className: 'chat-pet-achievements-list-item' }, [
 			h('button', {
 				type: 'button',
 				className: `chat-pet-achievement-card ${wearing ? 'wearing' : ''}`,
 				onClick: () => select(accessory.id),
-				'aria-label': t('achievements.cardAria', t(accessory.key), stateLabel),
+				'aria-label': wearing
+					? t('achievements.cardAria', t(accessory.key), t('achievements.wearing'))
+					: t(accessory.key),
 			}, [
 				h('div', { key: 'preview', className: 'chat-pet-achievement-previews' }, h(ChatPetPreview, {
 					accessoryId: accessory.id,
@@ -157,7 +161,7 @@ function HatsPanel(props) {
 				})),
 				h('div', { key: 'content', className: 'chat-pet-achievement-card-content' }, [
 					h('h3', { key: 'title' }, t(accessory.key)),
-					h('span', { key: 'state', className: 'chat-pet-achievement-state' }, stateLabel),
+					wearing ? h('span', { key: 'state', className: 'chat-pet-achievement-state' }, t('achievements.wearing')) : null,
 				]),
 			]),
 		])
@@ -169,11 +173,11 @@ function HatsPanel(props) {
 		h('section', {
 			key: 'collection',
 			className: 'chat-pet-achievements-collection',
-			'aria-label': t('achievements.collectionAria', hats.length),
+			'aria-label': t('achievements.collectionAria', unlockedCount),
 		}, [
 			h('div', { key: 'header', className: 'chat-pet-achievements-collection-header' }, [
 				h('h2', { key: 'h2' }, t('achievements.collection')),
-				h('span', { key: 'count', className: 'chat-pet-achievements-count' }, t('achievements.count', hats.length)),
+				h('span', { key: 'count', className: 'chat-pet-achievements-count' }, t('achievements.count', unlockedCount, unlockedCount)),
 			]),
 			h('ul', { key: 'list', className: 'chat-pet-achievements-list' }, [
 				h('li', { key: 'none', className: 'chat-pet-achievements-list-item' }, h('button', {
@@ -185,10 +189,27 @@ function HatsPanel(props) {
 					h('div', { key: 'preview', className: 'chat-pet-achievement-previews' }, h(ChatPetPreview, { accessoryId: null, unlocked: true, color: prefs.color, variant })),
 					h('div', { key: 'content', className: 'chat-pet-achievement-card-content' }, [
 						h('h3', { key: 'title' }, t('achievements.noHat')),
-						h('span', { key: 'state', className: 'chat-pet-achievement-state' }, noHatWearing ? t('achievements.wearing') : t('achievements.select')),
+						noHatWearing ? h('span', { key: 'state', className: 'chat-pet-achievement-state' }, t('achievements.wearing')) : null,
 					]),
 				])),
 				...hats.map(card),
+				h('li', { key: 'true-name', className: 'chat-pet-achievements-list-item' }, h('button', {
+					type: 'button',
+					className: 'chat-pet-achievement-card true-name',
+					onClick: () => onTab('color'),
+					'aria-label': t('achievements.cardAria', t('achievement.blobby.title'), t('color.custom')),
+				}, [
+					h('div', { key: 'preview', className: 'chat-pet-achievement-previews' }, h(ChatPetPreview, {
+						accessoryId: null,
+						unlocked: true,
+						color: prefs.color,
+						variant,
+					})),
+					h('div', { key: 'content', className: 'chat-pet-achievement-card-content' }, [
+						h('h3', { key: 'title' }, t('achievement.blobby.title')),
+						h('span', { key: 'state', className: 'chat-pet-achievement-state' }, t('color.custom')),
+					]),
+				])),
 			]),
 		]),
 		h('p', { key: 'note', className: 'chat-pet-hats-note' }, t('hats.note')),
@@ -337,7 +358,7 @@ function ChatPetPanel(props) {
 		]),
 		h('div', { key: 'body', className: 'chat-pet-panel-body' }, tab === 'color'
 			? h(ColorPanel, { controller, t })
-			: h(HatsPanel, { controller, t })),
+			: h(HatsPanel, { controller, onTab, t })),
 	]))
 }
 

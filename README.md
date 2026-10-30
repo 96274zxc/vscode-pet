@@ -34,12 +34,14 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   the despawn/respawn portal sequence. The composer card is its only perch: it spawns and respawns
   above that card, follows it when the window or input grows/shrinks, bounces off the side walls,
   and its respawn drop is capped above the composer instead of falling from the top of the chat.
-- Right-click for **Hats**, **Play Jump Game**, **Go on the Run / Come Back**,
-  **Grow / Shrink / Reset Size** and **Change Color**.
-- 13 hats from the official catalog. The DSH port does not track achievements, so every hat is
-  unlocked by default and the initial look is **Insiders + Cowboy Hat**. The old achievement panel
-  is now a hat picker; unlock hints, rewards and "new" badges are not shown. `/blobby` still unlocks
-  **True Name** for the solid and custom colors.
+- Right-click for **Hats**, **Jump Game**, **Go on the Run / Come Back**,
+  **Grow / Shrink / Reset Size** and **Color**.
+- 13 hats from the official catalog plus the **True Name** custom-color entry, laid out with the
+  DSH-only **No Hat** option as a 3-column, 15-card grid. The counter keeps VS Code's "14 of 14
+  unlocked" wording; only the 13 hats and True Name are counted. The DSH port does not track
+  achievements, so every hat is unlocked by default and the initial look is **Insiders + Cowboy
+  Hat**; unlock hints, rewards and "new" badges are not shown. `/blobby` still unlocks **True
+  Name** for the solid and custom colors.
 - Stable/Insiders colors plus the eight official solid presets and a custom hex color (unlocked by
   `/blobby`). Hats and colors are applied immediately and persist.
 - Blobby's jump game: Space to charge, release to jump, Left/Right to aim or hop, Escape to exit,

@@ -217,4 +217,6 @@ test('preferences normalize unsafe values', () => {	const prefs = t.normalizeCha
 	assert.equal(t.normalizeChatPetPrefs({ v: 1, accessory: null }).accessory, 'cowboyHat')
 	assert.equal(t.normalizeChatPetPrefs({ v: 2, accessory: null }).accessory, null)
 	assert.equal(t.normalizeChatPetPrefs({ v: 2, accessory: 'wizardHat' }).accessory, 'wizardHat')
+	assert.equal(t.CHAT_PET_ACHIEVEMENTS.length, 14)
+	assert.equal(t.CHAT_PET_ACHIEVEMENTS.filter(achievement => achievement.accessory).length, 13)
 })
