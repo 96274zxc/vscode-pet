@@ -151,30 +151,34 @@ function ChatPetMenu(props) {
 	}, label)
 	const jumpEnabled = !controller.dead && !controller.airborne && !controller.onTheRun
 	const sizeControl = h('div', { key: 'size', className: 'chat-pet-menu-size' }, [
-		h('button', {
-			key: 'shrink',
-			type: 'button',
-			className: 'chat-pet-menu-size-step',
-			disabled: controller.scale <= CHAT_PET_MIN_SCALE,
-			'aria-label': t('menu.shrink'),
-			title: t('menu.shrink'),
-			onClick: () => controller.shrink(),
-		}, '\u2212'),
+		h('div', { key: 'steps', className: 'chat-pet-menu-size-row' }, [
+			h('button', {
+				key: 'shrink',
+				type: 'button',
+				className: 'chat-pet-menu-size-button',
+				disabled: controller.scale <= CHAT_PET_MIN_SCALE,
+				onClick: () => controller.shrink(),
+			}, [
+				h('span', { key: 'icon', className: 'chat-pet-menu-size-icon' }, '\u2212'),
+				h('span', { key: 'label' }, t('menu.shrink')),
+			]),
+			h('button', {
+				key: 'grow',
+				type: 'button',
+				className: 'chat-pet-menu-size-button grow',
+				onClick: () => controller.grow(),
+			}, [
+				h('span', { key: 'label' }, t('menu.grow')),
+				h('span', { key: 'icon', className: 'chat-pet-menu-size-icon' }, '+'),
+			]),
+		]),
 		h('button', {
 			key: 'reset',
 			type: 'button',
-			className: 'chat-pet-menu-size-reset',
+			className: 'chat-pet-menu-size-button chat-pet-menu-size-reset',
 			disabled: Math.abs(controller.scale - 1) < 0.001,
 			onClick: () => controller.resetSize(),
 		}, t('menu.resetSize')),
-		h('button', {
-			key: 'grow',
-			type: 'button',
-			className: 'chat-pet-menu-size-step',
-			'aria-label': t('menu.grow'),
-			title: t('menu.grow'),
-			onClick: () => controller.grow(),
-		}, '+'),
 	])
 	return h('div', {
 		ref,
