@@ -171,6 +171,21 @@ test('eye accessories follow gaze only while Blobby tracks the cursor', () => {
 	assert.equal(offset[1], 0)
 })
 
+test('context menu sits above-left of the pointer and flips near edges', () => {
+	let position = t.getChatPetMenuPosition(500, 1000, 190, 242, 1000, 1200)
+	assert.equal(position[0], 310)
+	assert.equal(position[1], 758)
+	position = t.getChatPetMenuPosition(50, 100, 190, 242, 1000, 1200)
+	assert.equal(position[0], 50)
+	assert.equal(position[1], 100)
+	position = t.getChatPetMenuPosition(995, 1195, 190, 242, 1000, 1200)
+	assert.equal(position[0], 802)
+	assert.equal(position[1], 950)
+	position = t.getChatPetMenuPosition(2, 2, 190, 242, 1000, 1200)
+	assert.equal(position[0], 8)
+	assert.equal(position[1], 8)
+})
+
 test('scale, horizontal position and wide sprites clamp exactly', () => {
 	assert.equal(t.getChatPetScale(1, -0.2), 0.8)
 	assert.equal(t.getChatPetScale(0.4, -0.2), 0.4)

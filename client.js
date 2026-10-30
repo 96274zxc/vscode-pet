@@ -678,6 +678,23 @@ function getChatPetHorizontalPosition(left, minimumLeft, maximumLeft) {
 	return Math.max(minimumLeft, Math.min(Math.max(minimumLeft, maximumLeft), left))
 }
 
+function getChatPetMenuPosition(anchorX, anchorY, width, height, viewportWidth, viewportHeight, margin = 8) {
+	// Default: the pointer sits on the menu's bottom-right corner, so the
+	// menu opens up and to the left. Flip to the other side when that would
+	// leave the viewport, and clamp if neither side fits.
+	let left = anchorX - width
+	if (left < margin) left = anchorX
+	if (left + width > viewportWidth - margin) left = viewportWidth - width - margin
+	left = Math.max(margin, left)
+
+	let top = anchorY - height
+	if (top < margin) top = anchorY
+	if (top + height > viewportHeight - margin) top = viewportHeight - height - margin
+	top = Math.max(margin, top)
+
+	return [left, top]
+}
+
 function getChatPetDefaultHorizontalPosition(minimumLeft, maximumLeft) {
 	return Math.max(minimumLeft, maximumLeft - CHAT_PET_DEFAULT_RIGHT_INSET)
 }
@@ -3397,7 +3414,21 @@ function ChatPetPreview(props) {
 function ChatPetMenu(props) {
 	const { menu, controller, onClose } = props
 	const ref = React.useRef(null)
+	const [position, setPosition] = React.useState(null)
 	const t = controller?._tr?.bind(controller) ?? (key => CHAT_PET_LOCALE.en[key] ?? key)
+	React.useLayoutEffect(() => {
+		if (!menu) return
+		const layer = ref.current
+		if (!layer) return
+		const place = () => {
+			const rect = layer.getBoundingClientRect()
+			const [left, top] = getChatPetMenuPosition(menu.x, menu.y, rect.width, rect.height, window.innerWidth, window.innerHeight)
+			setPosition({ left, top })
+		}
+		place()
+		window.addEventListener('resize', place)
+		return () => window.removeEventListener('resize', place)
+	}, [menu])
 	React.useEffect(() => {
 		if (!menu) return
 		const layer = ref.current
@@ -3433,10 +3464,6 @@ function ChatPetMenu(props) {
 		}
 	}, [menu, onClose])
 	if (!menu || !controller) return null
-	const width = 190
-	const height = 266
-	const left = Math.max(8, Math.min(window.innerWidth - width - 8, menu.x - width))
-	const top = Math.max(8, Math.min(window.innerHeight - height - 8, menu.y - 8))
 	const item = (key, label, enabled, onClick) => h('button', {
 		key,
 		type: 'button',
@@ -3449,7 +3476,7 @@ function ChatPetMenu(props) {
 		ref,
 		className: 'chat-pet-menu',
 		role: 'menu',
-		style: { left: `${left}px`, top: `${top}px` },
+		style: { left: `${position ? position.left : -9999}px`, top: `${position ? position.top : -9999}px` },
 		onContextMenu: event => event.preventDefault(),
 	}, [
 		item('hats', t('menu.hats'), true, () => controller.host.openPanel('hats')),
@@ -4466,6 +4493,7 @@ const __test = {
 	getChatPetEyeAccessoryGazeOffsetForState,
 	getChatPetScale,
 	getChatPetHorizontalPosition,
+	getChatPetMenuPosition,
 	getChatPetDefaultHorizontalPosition,
 	getChatPetRestoredHorizontalPosition,
 	getChatPetHorizontalAnchor,

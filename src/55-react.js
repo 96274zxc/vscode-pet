@@ -63,7 +63,21 @@ function ChatPetPreview(props) {
 function ChatPetMenu(props) {
 	const { menu, controller, onClose } = props
 	const ref = React.useRef(null)
+	const [position, setPosition] = React.useState(null)
 	const t = controller?._tr?.bind(controller) ?? (key => CHAT_PET_LOCALE.en[key] ?? key)
+	React.useLayoutEffect(() => {
+		if (!menu) return
+		const layer = ref.current
+		if (!layer) return
+		const place = () => {
+			const rect = layer.getBoundingClientRect()
+			const [left, top] = getChatPetMenuPosition(menu.x, menu.y, rect.width, rect.height, window.innerWidth, window.innerHeight)
+			setPosition({ left, top })
+		}
+		place()
+		window.addEventListener('resize', place)
+		return () => window.removeEventListener('resize', place)
+	}, [menu])
 	React.useEffect(() => {
 		if (!menu) return
 		const layer = ref.current
@@ -99,10 +113,6 @@ function ChatPetMenu(props) {
 		}
 	}, [menu, onClose])
 	if (!menu || !controller) return null
-	const width = 190
-	const height = 266
-	const left = Math.max(8, Math.min(window.innerWidth - width - 8, menu.x - width))
-	const top = Math.max(8, Math.min(window.innerHeight - height - 8, menu.y - 8))
 	const item = (key, label, enabled, onClick) => h('button', {
 		key,
 		type: 'button',
@@ -115,7 +125,7 @@ function ChatPetMenu(props) {
 		ref,
 		className: 'chat-pet-menu',
 		role: 'menu',
-		style: { left: `${left}px`, top: `${top}px` },
+		style: { left: `${position ? position.left : -9999}px`, top: `${position ? position.top : -9999}px` },
 		onContextMenu: event => event.preventDefault(),
 	}, [
 		item('hats', t('menu.hats'), true, () => controller.host.openPanel('hats')),

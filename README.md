@@ -42,6 +42,8 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   achievements, so every hat is unlocked by default and the initial look is **Insiders + Cowboy
   Hat**; unlock hints, rewards and "new" badges are not shown. `/blobby` still unlocks **True
   Name** for the solid and custom colors.
+- Click reactions include a rare (~1%) **yapping** fall: Blobby tips over and opens its mouth; the
+  light gap is the official sprite's open mouth, not missing artwork.
 - Stable/Insiders colors plus the eight official solid presets and a custom hex color (unlocked by
   `/blobby`). Hats and colors are applied immediately and persist.
 - Blobby's jump game: Space to charge, release to jump, Left/Right to aim or hop, Escape to exit,

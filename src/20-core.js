@@ -176,6 +176,23 @@ function getChatPetHorizontalPosition(left, minimumLeft, maximumLeft) {
 	return Math.max(minimumLeft, Math.min(Math.max(minimumLeft, maximumLeft), left))
 }
 
+function getChatPetMenuPosition(anchorX, anchorY, width, height, viewportWidth, viewportHeight, margin = 8) {
+	// Default: the pointer sits on the menu's bottom-right corner, so the
+	// menu opens up and to the left. Flip to the other side when that would
+	// leave the viewport, and clamp if neither side fits.
+	let left = anchorX - width
+	if (left < margin) left = anchorX
+	if (left + width > viewportWidth - margin) left = viewportWidth - width - margin
+	left = Math.max(margin, left)
+
+	let top = anchorY - height
+	if (top < margin) top = anchorY
+	if (top + height > viewportHeight - margin) top = viewportHeight - height - margin
+	top = Math.max(margin, top)
+
+	return [left, top]
+}
+
 function getChatPetDefaultHorizontalPosition(minimumLeft, maximumLeft) {
 	return Math.max(minimumLeft, maximumLeft - CHAT_PET_DEFAULT_RIGHT_INSET)
 }

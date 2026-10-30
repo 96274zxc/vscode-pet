@@ -95,6 +95,7 @@ const __test = {
 	getChatPetEyeAccessoryGazeOffsetForState,
 	getChatPetScale,
 	getChatPetHorizontalPosition,
+	getChatPetMenuPosition,
 	getChatPetDefaultHorizontalPosition,
 	getChatPetRestoredHorizontalPosition,
 	getChatPetHorizontalAnchor,
