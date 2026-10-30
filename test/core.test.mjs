@@ -222,6 +222,11 @@ test('locale fallback follows the host language before DSH t is ready', () => {
 	delete sandbox.document.documentElement
 })
 
+test('positional placeholders survive the DSH translation wrapper', () => {
+	const translate = key => key === 'achievements.count' ? '{0} of {1} unlocked' : key
+	assert.equal(t.translateChatPetText(translate, 'achievements.count', 3, 4), '3 of 4 unlocked')
+})
+
 test('accessory rig frames expose the documented poses', () => {
 	assert.equal(t.getChatPetAccessoryRigFrame('sleep', 4).pose, 'sleeping')
 	assert.equal(t.getChatPetAccessoryRigFrame('jump', 2).pose, 'airborne')

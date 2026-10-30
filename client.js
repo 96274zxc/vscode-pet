@@ -3438,10 +3438,10 @@ function ChatPetPreview(props) {
 }
 
 function ChatPetMenu(props) {
-	const { menu, controller, onClose, t: tProp } = props
+	const { menu, controller, onClose } = props
 	const ref = React.useRef(null)
 	const [position, setPosition] = React.useState(null)
-	const t = typeof tProp === 'function' ? tProp : (controller?._tr?.bind(controller) ?? (key => getChatPetFallbackDictionary()[key] ?? key))
+	const t = controller?._tr?.bind(controller) ?? (key => getChatPetFallbackDictionary()[key] ?? key)
 	React.useLayoutEffect(() => {
 		if (!menu) return
 		const layer = ref.current
@@ -3706,8 +3706,10 @@ function ColorPanel(props) {
 }
 
 function ChatPetPanel(props) {
-	const { panel, tab, onTab, onClose, controller, t: tProp } = props
-	const t = typeof tProp === 'function' ? tProp : (controller?._tr?.bind(controller) ?? (key => getChatPetFallbackDictionary()[key] ?? key))
+	const { panel, tab, onTab, onClose, controller } = props
+	// Keep the controller translator: locale strings use positional {0}/{1}
+	// placeholders, while DSH's raw t expects named params.
+	const t = controller?._tr?.bind(controller) ?? (key => getChatPetFallbackDictionary()[key] ?? key)
 	const ref = React.useRef(null)
 	React.useEffect(() => {
 		const layer = ref.current
@@ -3859,15 +3861,14 @@ function PetSlot(props) {
 
 	const onClose = React.useCallback(() => setUi(current => ({ ...current, menu: null, panel: null })), [])
 	const onTab = React.useCallback(tab => setUi(current => ({ ...current, tab })), [])
-	const t = typeof props.t === 'function' ? props.t : key => getChatPetFallbackDictionary()[key] ?? key
 
 	return h(React.Fragment, null, [
 		h('div', { key: 'anchor', ref: anchorRef, className: 'dsh-blobby-anchor', 'aria-hidden': 'true' }),
 		target ? createPortal(h('div', { key: 'portal', className: 'dsh-blobby-portal' }, [
 			h('div', { key: 'mount', ref: mountRef, className: 'dsh-blobby-mount' }),
 			h('div', { key: 'status', ref: statusNode, className: 'dsh-blobby-status', role: 'status', 'aria-live': 'polite' }),
-			h(ChatPetMenu, { key: 'menu', menu: ui.menu, controller, onClose, t }),
-			h(ChatPetPanel, { key: 'panel', panel: ui.panel, tab: ui.tab, onClose, onTab, controller, t }),
+			h(ChatPetMenu, { key: 'menu', menu: ui.menu, controller, onClose }),
+			h(ChatPetPanel, { key: 'panel', panel: ui.panel, tab: ui.tab, onClose, onTab, controller }),
 		]), target) : null,
 	])
 }
