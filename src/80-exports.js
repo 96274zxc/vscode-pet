@@ -26,6 +26,13 @@ function installChatPetDebugApi() {
 
 function apply(ctx) {
 	ctx.effect(() => ctx.locale.register(CHAT_PET_LOCALE_NS, CHAT_PET_LOCALE), 'vscode-pet: dictionaries')
+	const subscribeLocale = scope => {
+		const locale = typeof scope.get === 'function' ? scope.get('locale') : undefined
+		if (!locale || typeof locale.subscribe !== 'function') return
+		scope.effect(() => locale.subscribe(() => notifyChatPetLocaleChanged()), 'vscode-pet: locale changes')
+	}
+	if (typeof ctx.inject === 'function') ctx.inject(['locale'], subscribeLocale)
+	else subscribeLocale(ctx)
 	ctx.effect(() => injectChatPetStyles(), 'vscode-pet: styles')
 	ctx.effect(() => installChatPetDebugApi(), 'vscode-pet: debug api')
 	ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
@@ -78,6 +85,9 @@ function apply(ctx) {
 
 const __test = {
 	CHAT_PET_STATES,
+	CHAT_PET_LOCALE,
+	getChatPetFallbackDictionary,
+	translateChatPetText,
 	CHAT_PET_IDLE_SLEEP_DELAY,
 	CHAT_PET_CONFIRMATION_ATTENTION_DURATION,
 	CHAT_PET_ACHIEVEMENT_UNLOCKED_DURATION,

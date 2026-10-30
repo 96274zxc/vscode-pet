@@ -629,7 +629,7 @@
 	align-items: center;
 	justify-content: center;
 	height: 50px;
-	background: var(--dsw-specific-sidebar-fill);
+	background: transparent;
 }
 
 .chat-pet-achievement-preview {

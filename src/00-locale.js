@@ -12,40 +12,40 @@ const CHAT_PET_LOCALE = {
 		'status.shown': 'Blobby is back.',
 		'status.hidden': 'Blobby is hidden. Use /vscode-pet to show it again.',
 		'status.achievement': 'Unlocked: {0}. Activate Blobby to view colors.',
-		'status.wokeUp': 'Blobby woke up.',
-		'status.pressedButton': 'Blobby pressed its button.',
-		'status.spun': 'Blobby did a rare spin.',
-		'status.loved': 'Blobby feels loved.',
-		'status.cool': 'Blobby put on sunglasses.',
-		'status.yapping': 'Blobby is yapping.',
-		'status.singing': 'Blobby is singing.',
-		'status.speechless': 'Blobby is speechless.',
-		'status.worried': 'Blobby is worried.',
-		'status.dizzy': 'Blobby is dizzy.',
-		'status.fellOff': 'Blobby fell off and will respawn automatically.',
-		'status.respawning': 'Blobby is respawning.',
-		'status.bounceCount': 'Blobby bounce count: {0}.',
-		'status.bounceMilestone': 'Blobby landed with a {0}-bounce streak.',
-		'status.grew': 'Blobby size: {0} percent.',
-		'status.shrank': 'Blobby size: {0} percent.',
-		'status.sizeReset': 'Blobby size: {0} percent.',
+		'status.wokeUp': 'The VS Code pet woke up',
+		'status.pressedButton': 'The VS Code pet pressed its button',
+		'status.spun': 'The VS Code pet did a rare spin',
+		'status.loved': 'The VS Code pet feels loved',
+		'status.cool': 'The VS Code pet put on sunglasses',
+		'status.yapping': 'The VS Code pet is yapping',
+		'status.singing': 'The VS Code pet is singing',
+		'status.speechless': 'The VS Code pet is speechless',
+		'status.worried': 'The VS Code pet is worried',
+		'status.dizzy': 'The VS Code pet got dizzy',
+		'status.fellOff': 'The VS Code pet fell off and will respawn automatically',
+		'status.respawning': 'The VS Code pet is respawning',
+		'status.bounceCount': 'VS Code pet bounce count: {0}',
+		'status.bounceMilestone': 'The VS Code pet landed with a {0}-bounce streak',
+		'status.grew': 'VS Code pet size: {0} percent',
+		'status.shrank': 'VS Code pet size: {0} percent',
+		'status.sizeReset': 'VS Code pet size: {0} percent',
 		'status.onTheRun': 'Blobby is on the run. Click Blobby to bring it back.',
 		'status.comeBack': 'Blobby came back.',
 		'status.hatSelected': 'Blobby is now wearing {0}.',
 		'status.hatRemoved': 'Blobby hat removed.',
-		'aria.pet': 'Interact with Blobby. Drag it around the chat, or flick it toward either side to throw it. While it is falling, catch it with the pointer to bounce it; while it is airborne, press Enter or Space to bounce it. Use the left and right arrow keys to make it hop, or hold Shift to throw it toward a wall. Use the context menu to put it on the run.',
+		'aria.pet': 'Interact with the VS Code pet. Drag it around the chat, or flick it toward either side to throw it. While it is falling, catch it with the pointer to bounce it; while it is airborne, press Enter or Space to bounce it. Use the left and right arrow keys to make it hop, or hold Shift to throw it toward a wall. Use the context menu to put it on the run.',
 		'aria.painting': 'Painting an image. {0}',
-		'aria.onTheRun': 'Bring back Blobby.',
+		'aria.onTheRun': 'Bring back the VS Code pet',
 		'aria.achievement': 'Open the Blobby hats panel.',
-		'aria.jump': "Play Blobby's Jump Game. Activate Blobby on this perch to play, or drag it to move it.",
+		'aria.jump': "Play Blobby's Jump Game. Activate the pet on this perch to play, or drag it to move it.",
 		'menu.hats': 'Hats',
-		'menu.playJump': 'Jump Game',
+		'menu.playJump': 'Play Jump Game',
 		'menu.goOnTheRun': 'Go on the Run',
 		'menu.comeBack': 'Come Back',
 		'menu.grow': 'Grow',
 		'menu.shrink': 'Shrink',
 		'menu.resetSize': 'Reset Size',
-		'menu.changeColor': 'Color',
+		'menu.changeColor': 'Change Color',
 		'panel.title': 'Customize Blobby',
 		'panel.tab.hats': 'Hats',
 		'panel.tab.color': 'Color',
@@ -253,13 +253,22 @@ function formatChatPetText(template, ...args) {
 	})
 }
 
+function getChatPetFallbackDictionary() {
+	let language = ''
+	try {
+		if (typeof document !== 'undefined' && document.documentElement?.lang) language = document.documentElement.lang
+		else if (typeof navigator !== 'undefined' && navigator.language) language = navigator.language
+	} catch (ignored) { /* use the English catalog when no document is available */ }
+	return String(language).toLowerCase().startsWith('zh') ? CHAT_PET_LOCALE.zh : CHAT_PET_LOCALE.en
+}
+
 function translateChatPetText(t, key, ...args) {
 	let template
 	if (typeof t === 'function') {
 		try { template = t(key) } catch (ignored) { /* fall through */ }
 	}
 	if (template === undefined || template === key) {
-		template = CHAT_PET_LOCALE.en[key] ?? key
+		template = getChatPetFallbackDictionary()[key] ?? CHAT_PET_LOCALE.en[key] ?? key
 	}
 	return formatChatPetText(template, ...args)
 }

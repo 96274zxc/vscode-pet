@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Blobby",
-    "description": "A DSH port of VS Code's official Blobby chat pet, built from its logic and sprite assets: official sheets, hats, custom colors, chat reactions, drag/throw, achievements and jump game. Original: https://github.com/microsoft/vscode/tree/main/src/vs/workbench/contrib/chat/browser/widget/media/chatPet"
+    "description": "A DSH port of VS Code's official Blobby chat pet, built from its logic and sprite assets: official sheets, hats, custom colors, chat reactions, drag/throw, and jump game. Original: https://github.com/microsoft/vscode/tree/main/src/vs/workbench/contrib/chat/browser/widget/media/chatPet"
   }
 }

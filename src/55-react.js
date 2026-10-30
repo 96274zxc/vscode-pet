@@ -2,6 +2,23 @@
 
 let activeBlobbyController = null
 
+const chatPetLocaleListeners = new Set()
+let chatPetLocaleRevision = 0
+
+function subscribeChatPetLocale(listener) {
+	chatPetLocaleListeners.add(listener)
+	return () => chatPetLocaleListeners.delete(listener)
+}
+
+function getChatPetLocaleRevision() {
+	return chatPetLocaleRevision
+}
+
+function notifyChatPetLocaleChanged() {
+	chatPetLocaleRevision += 1
+	for (const listener of [...chatPetLocaleListeners]) listener()
+}
+
 function useBlobbyPrefs() {
 	return React.useSyncExternalStore(
 		callback => chatPetPrefs.subscribe(callback),
@@ -61,10 +78,10 @@ function ChatPetPreview(props) {
 }
 
 function ChatPetMenu(props) {
-	const { menu, controller, onClose } = props
+	const { menu, controller, onClose, t: tProp } = props
 	const ref = React.useRef(null)
 	const [position, setPosition] = React.useState(null)
-	const t = controller?._tr?.bind(controller) ?? (key => CHAT_PET_LOCALE.en[key] ?? key)
+	const t = typeof tProp === 'function' ? tProp : (controller?._tr?.bind(controller) ?? (key => getChatPetFallbackDictionary()[key] ?? key))
 	React.useLayoutEffect(() => {
 		if (!menu) return
 		const layer = ref.current
@@ -75,9 +92,16 @@ function ChatPetMenu(props) {
 			setPosition({ left, top })
 		}
 		place()
-		window.addEventListener('resize', place)
-		return () => window.removeEventListener('resize', place)
 	}, [menu])
+	React.useEffect(() => {
+		if (!menu) return
+		// A menu anchored to the old window size looks detached after a resize
+		// (for example when the user maximizes the DSH window); close it instead
+		// of leaving it at a stale position.
+		const onResize = () => onClose()
+		window.addEventListener('resize', onResize)
+		return () => window.removeEventListener('resize', onResize)
+	}, [menu, onClose])
 	React.useEffect(() => {
 		if (!menu) return
 		const layer = ref.current
@@ -322,8 +346,8 @@ function ColorPanel(props) {
 }
 
 function ChatPetPanel(props) {
-	const { panel, tab, onTab, onClose, controller } = props
-	const t = controller?._tr?.bind(controller) ?? (key => CHAT_PET_LOCALE.en[key] ?? key)
+	const { panel, tab, onTab, onClose, controller, t: tProp } = props
+	const t = typeof tProp === 'function' ? tProp : (controller?._tr?.bind(controller) ?? (key => getChatPetFallbackDictionary()[key] ?? key))
 	const ref = React.useRef(null)
 	React.useEffect(() => {
 		const layer = ref.current
@@ -373,6 +397,7 @@ function ChatPetPanel(props) {
 }
 
 function PetSlot(props) {
+	React.useSyncExternalStore(subscribeChatPetLocale, getChatPetLocaleRevision, getChatPetLocaleRevision)
 	const tRef = React.useRef(props.t)
 	tRef.current = props.t
 	const [target, setTarget] = React.useState(null)
@@ -474,15 +499,15 @@ function PetSlot(props) {
 
 	const onClose = React.useCallback(() => setUi(current => ({ ...current, menu: null, panel: null })), [])
 	const onTab = React.useCallback(tab => setUi(current => ({ ...current, tab })), [])
-	const t = typeof props.t === 'function' ? props.t : key => CHAT_PET_LOCALE.en[key] ?? key
+	const t = typeof props.t === 'function' ? props.t : key => getChatPetFallbackDictionary()[key] ?? key
 
 	return h(React.Fragment, null, [
 		h('div', { key: 'anchor', ref: anchorRef, className: 'dsh-blobby-anchor', 'aria-hidden': 'true' }),
 		target ? createPortal(h('div', { key: 'portal', className: 'dsh-blobby-portal' }, [
 			h('div', { key: 'mount', ref: mountRef, className: 'dsh-blobby-mount' }),
 			h('div', { key: 'status', ref: statusNode, className: 'dsh-blobby-status', role: 'status', 'aria-live': 'polite' }),
-			h(ChatPetMenu, { key: 'menu', menu: ui.menu, controller, onClose }),
-			h(ChatPetPanel, { key: 'panel', panel: ui.panel, tab: ui.tab, onClose, onTab, controller }),
+			h(ChatPetMenu, { key: 'menu', menu: ui.menu, controller, onClose, t }),
+			h(ChatPetPanel, { key: 'panel', panel: ui.panel, tab: ui.tab, onClose, onTab, controller, t }),
 		]), target) : null,
 	])
 }

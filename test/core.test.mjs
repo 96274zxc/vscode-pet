@@ -195,6 +195,33 @@ test('scale, horizontal position and wide sprites clamp exactly', () => {
 	assert.equal(t.getChatPetWideSpriteHorizontalOffset('typing', 'right', 700, 748, 100, 740, 1), -44)
 })
 
+test('English and Chinese catalogs stay complete and in sync', () => {
+	const en = t.CHAT_PET_LOCALE.en
+	const zh = t.CHAT_PET_LOCALE.zh
+	assert.deepEqual(Object.keys(en).sort(), Object.keys(zh).sort())
+	for (const [key, value] of Object.entries(en)) {
+		assert.ok(value.trim(), key)
+		assert.doesNotMatch(value, /[\u3400-\u9fff]/, `${key} must be English`)
+	}
+	for (const [key, value] of Object.entries(zh)) assert.ok(value.trim(), key)
+	assert.equal(en['status.dizzy'], 'The VS Code pet got dizzy')
+	assert.equal(en['status.grew'], 'VS Code pet size: {0} percent')
+	assert.equal(en['aria.onTheRun'], 'Bring back the VS Code pet')
+	assert.equal(en['menu.goOnTheRun'], 'Go on the Run')
+	assert.equal(en['menu.playJump'], 'Play Jump Game')
+	assert.equal(en['menu.changeColor'], 'Change Color')
+})
+
+test('locale fallback follows the host language before DSH t is ready', () => {
+	assert.equal(t.getChatPetFallbackDictionary(), t.CHAT_PET_LOCALE.en)
+	sandbox.document.documentElement = { lang: 'zh-CN' }
+	assert.equal(t.getChatPetFallbackDictionary(), t.CHAT_PET_LOCALE.zh)
+	assert.equal(t.translateChatPetText(undefined, 'menu.hats'), '帽子')
+	sandbox.document.documentElement.lang = 'en-US'
+	assert.equal(t.translateChatPetText(undefined, 'menu.hats'), 'Hats')
+	delete sandbox.document.documentElement
+})
+
 test('accessory rig frames expose the documented poses', () => {
 	assert.equal(t.getChatPetAccessoryRigFrame('sleep', 4).pose, 'sleeping')
 	assert.equal(t.getChatPetAccessoryRigFrame('jump', 2).pose, 'airborne')
