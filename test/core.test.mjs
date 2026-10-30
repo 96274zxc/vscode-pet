@@ -212,6 +212,7 @@ test('English and Chinese catalogs stay complete and in sync', () => {
 	assert.equal(en['menu.goOnTheRun'], 'Go on the Run')
 	assert.equal(en['menu.playJump'], 'Play Jump Game')
 	assert.equal(en['menu.changeColor'], 'Change Color')
+	assert.equal(zh['menu.shrink'], '缩小')
 	assert.equal(en['achievement.blobby.title'], 'Color Customization')
 	assert.equal(zh['achievement.blobby.title'], '颜色自定义')
 	assert.equal(en['color.stable'], 'Stable')

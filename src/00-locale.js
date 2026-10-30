@@ -163,7 +163,7 @@ const CHAT_PET_LOCALE = {
 		'menu.goOnTheRun': '跑路',
 		'menu.comeBack': '回来',
 		'menu.grow': '变大',
-		'menu.shrink': '变小',
+		'menu.shrink': '缩小',
 		'menu.resetSize': '恢复大小',
 		'menu.changeColor': '颜色',
 		'panel.title': '自定义 Blobby',
