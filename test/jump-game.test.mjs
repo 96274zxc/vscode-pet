@@ -88,3 +88,25 @@ test('falling past the starting platform reports hasFallen', () => {
 	for (let i = 0; i < 120; i++) model.advance(100)
 	assert.equal(model.hasFallen, true)
 })
+
+test('prune drops far-below platforms and walls but keeps the current one', () => {
+	const model = new Model(320, 48, 160, seeded(17))
+	model.ensurePlatforms(6000)
+	const total = model.platforms.length
+	assert.ok(total > 10)
+	const last = model.platforms[model.platforms.length - 1]
+	model.player.platform = last.id
+	model.player.height = last.height
+	model.walls.push({ id: 9001, left: 10, width: 8, bottom: 0, top: 10 })
+	model.walls.push({ id: 9002, left: 10, width: 8, bottom: last.height - 10, top: last.height + 10 })
+	model.prune(last.height - 200)
+	assert.ok(model.platforms.length < total)
+	assert.equal(model.platforms[model.platforms.length - 1], last)
+	assert.equal(model.player.platform, last.id)
+	for (const platform of model.platforms) assert.ok(platform.height >= last.height - 200 || platform.id === last.id)
+	assert.ok(model.walls.every(wall => wall.top >= last.height - 200 || -wall.id === last.id))
+	assert.ok(!model.walls.some(wall => wall.id === 9001))
+	assert.ok(model.walls.some(wall => wall.id === 9002))
+	model.ensurePlatforms(last.height + 1600)
+	assert.ok(model.platforms[model.platforms.length - 1].height > last.height)
+})

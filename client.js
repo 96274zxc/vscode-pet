@@ -5492,6 +5492,20 @@ class ChatPetJumpGameModel {
 		}
 	}
 
+	prune(minimumHeight) {
+		// Platforms/walls this far below the camera can never be seen again, so
+		// they are dropped instead of keeping the array growing for the whole run.
+		// Keep the platform the player stands on (and the wall they stand on) plus
+		// the newest platform, which ensurePlatforms() builds from.
+		if (!Number.isFinite(minimumHeight)) return
+		while (this._platforms.length > 1) {
+			const platform = this._platforms[0]
+			if (platform.height >= minimumHeight || platform.id === this._player.platform) break
+			this._platforms.shift()
+		}
+		this._walls = this._walls.filter(wall => wall.top >= minimumHeight || -wall.id === this._player.platform)
+	}
+
 	step() {
 		const player = this._player
 		this.steps++
@@ -5729,6 +5743,7 @@ class BlobbyJumpGame {
 		if (this.displayedHops !== this.model.hops) this.updateScore()
 		const cameraHeight = Math.max(0, player.height)
 		this.model.ensurePlatforms(player.height + this.anchor + this.model.petSize * 4)
+		this.model.prune(player.height - (this.bounds.height - this.anchor) - this.model.petSize * 2)
 		const visible = new Set()
 		for (const platform of this.model.platforms) {
 			const top = this.anchor + cameraHeight - platform.height + platform.fallDistance
