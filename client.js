@@ -2127,14 +2127,19 @@ function getChatPetDesktopTheme() {
 function drawChatPetDesktopEyes(context, state, frameIndex, color, eyeState) {
 	const resolved = eyeState ?? state
 	if (resolved === 'dragging') {
+		// Reuse the exact in-window eye overlay geometry: the .chat-pet-eye box
+		// is 8x12 display px at (18,30)/(30,30) and .dragging adds two 8x2 lines
+		// rotated +-45deg around the box center. The desktop frame is 96px for a
+		// 48px display, so draw the same lines at 16x4 frame px around the same
+		// centers (44,72)/(68,72) with the pet's eye color.
 		context.fillStyle = getChatPetEyeColor(color)
 		for (const x of [40, 64]) {
 			context.save()
 			context.translate(x + 4, 72)
 			context.rotate(Math.PI / 4)
-			context.fillRect(-4, -1, 8, 2)
+			context.fillRect(-8, -2, 16, 4)
 			context.rotate(-Math.PI / 2)
-			context.fillRect(-4, -1, 8, 2)
+			context.fillRect(-8, -2, 16, 4)
 			context.restore()
 		}
 		return
