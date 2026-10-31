@@ -1540,7 +1540,7 @@ namespace BlobbyDesktop
 				_dragging = true;
 				_state.Dragging = true;
 				_phase = Phase.Dragging;
-				SetRenderedState("idle", Now());
+				SetRenderedState(_state.RenderState(_model, Now()), Now());
 				SetPetVisibility(true);
 				SetBubbleVisibility(false);
 				_window.Cursor = Cursors.Hand;

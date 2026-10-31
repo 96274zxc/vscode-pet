@@ -664,7 +664,7 @@ namespace BlobbyDesktop
 		public string RenderState(DesktopModel model, long now)
 		{
 			string baseState = BaseState(model, now);
-			if (Dragging) return "idle";
+			if (Dragging) return "dragging";
 			if ((Transient == "yapping" || Transient == "yappingMouthOpen") && baseState != "idle") return baseState;
 			return Transient ?? baseState;
 		}

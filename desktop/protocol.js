@@ -7,7 +7,7 @@ export const DESKTOP_STATES = [
 	'idle', 'sleep', 'waking', 'typing', 'rendering', 'painting', 'achievementUnlocked',
 	'buttonPress', 'complete', 'love', 'clapping', 'jump', 'cool', 'yapping',
 	'yappingMouthOpen', 'sing', 'speechless', 'worry', 'dizzy', 'falling', 'wallImpact',
-	'splat', 'onTheRun', 'searching', 'searchingDown',
+	'splat', 'onTheRun', 'searching', 'searchingDown', 'dragging',
 ]
 export const DESKTOP_STATE_SET = new Set(DESKTOP_STATES)
 export const DESKTOP_COMMANDS = new Set(['hats', 'color', 'jump'])

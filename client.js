@@ -1925,6 +1925,7 @@ function getChatPetDesktopFramePlan(variant) {
 			frames.push({ index: 0, duration: 0 })
 		}
 		plan[state] = {
+			key: state,
 			state,
 			url: source.url,
 			width: source.frameWidth,
@@ -1934,6 +1935,19 @@ function getChatPetDesktopFramePlan(variant) {
 			loop: source.iterations === Infinity,
 			tracksCursor: doesChatPetStateTrackCursor(state),
 			mirror: state !== 'sing',
+		}
+	}
+	const idle = plan.idle
+	if (idle) {
+		// While being dragged the in-window pet renders the idle body but swaps
+		// the pupils for crossed-out (X) eyes through a CSS eye overlay. The
+		// desktop helper renders frames, so bake the same overlay into an extra
+		// state instead of relying on DOM styles.
+		plan.dragging = {
+			...idle,
+			key: 'dragging',
+			eyeState: 'dragging',
+			tracksCursor: false,
 		}
 	}
 	return plan
@@ -2110,9 +2124,23 @@ function getChatPetDesktopTheme() {
 
 /* ---------------------------------------------------------------- painter */
 
-function drawChatPetDesktopEyes(context, state, frameIndex, color) {
-	if (!doesChatPetStateTrackCursor(state)) return
-	const bobbed = (state === 'idle' || state === 'rendering' || state === 'achievementUnlocked') && frameIndex >= 20
+function drawChatPetDesktopEyes(context, state, frameIndex, color, eyeState) {
+	const resolved = eyeState ?? state
+	if (resolved === 'dragging') {
+		context.fillStyle = getChatPetEyeColor(color)
+		for (const x of [40, 64]) {
+			context.save()
+			context.translate(x + 4, 72)
+			context.rotate(Math.PI / 4)
+			context.fillRect(-4, -1, 8, 2)
+			context.rotate(-Math.PI / 2)
+			context.fillRect(-4, -1, 8, 2)
+			context.restore()
+		}
+		return
+	}
+	if (!doesChatPetStateTrackCursor(resolved)) return
+	const bobbed = (resolved === 'idle' || resolved === 'rendering' || resolved === 'achievementUnlocked') && frameIndex >= 20
 	const top = 64 + (bobbed ? 4 : 0)
 	context.fillStyle = getChatPetEyeColor(color)
 	context.fillRect(40, top, 8, 16)
@@ -2152,7 +2180,7 @@ function drawChatPetDesktopFrame(context, entry, bodyImage, accessoryImage, acce
 		drawChatPetEyeAccessory(eyeContext, accessoryImage, entry.state, frame.index, facing, accessory?.eyeAccessoryMirrorsWithFacing !== false)
 		context.drawImage(eyeCanvas, 0, 0)
 	}
-	drawChatPetDesktopEyes(context, entry.state, frame.index, color)
+	drawChatPetDesktopEyes(context, entry.state, frame.index, color, entry.eyeState)
 }
 
 function renderChatPetDesktopStateFrames(entry, bodyImage, accessoryImage, accessory, color) {
@@ -2206,7 +2234,7 @@ async function renderChatPetDesktopPayload(options) {
 			bodyImages.set(entry.url, bodyImage)
 		}
 		const rendered = renderChatPetDesktopStateFrames(entry, bodyImage, accessoryImage, accessory, color)
-		states[entry.state] = {
+		states[entry.key] = {
 			width: entry.width,
 			height: entry.height,
 			durations: entry.frames.map(frame => frame.duration || 0),

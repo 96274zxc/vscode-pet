@@ -96,6 +96,12 @@ test('desktop frame plan mirrors the windowed animations', () => {
 	assert.equal(plan.onTheRun.frames.length, 1)
 	assert.ok(plan.complete.tracksCursor === false)
 	assert.ok(plan.clapping.tracksCursor === true)
+	assert.ok(states.includes('dragging'))
+	assert.equal(plan.dragging.key, 'dragging')
+	assert.equal(plan.dragging.state, 'idle')
+	assert.equal(plan.dragging.eyeState, 'dragging')
+	assert.equal(plan.dragging.tracksCursor, false)
+	assert.equal(plan.dragging.frames, plan.idle.frames)
 })
 
 test('desktop model carries the shared timings, physics and menu labels', () => {

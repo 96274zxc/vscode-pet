@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import {
 	DESKTOP_PROTOCOL,
+	DESKTOP_STATES,
 	decodeDesktopPng,
 	isDesktopRequestSupported,
 	mergeDesktopSettings,
@@ -137,6 +138,7 @@ test('desktop settings, facts and commands normalize independently', () => {
 	assert.equal(merged.smartHide, true)
 	assert.equal(mergeDesktopSettings({ scale: 1 }, { scale: 0.01 }).scale, 1)
 	assert.equal(normalizeDesktopFacts({ running: true }).running, true)
+	assert.ok(DESKTOP_STATES.includes('dragging'))
 	assert.equal(normalizeDesktopFacts({ pendingInteraction: true }).pendingInteraction, true)
 	const cursorFacts = normalizeDesktopFacts({ running: true, grabbing: true, petRect: { left: 10, top: 20, width: 30, height: 40 } })
 	assert.equal(cursorFacts.grabbing, true)

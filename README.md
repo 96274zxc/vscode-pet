@@ -56,7 +56,8 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   position compensation and no per-frame topmost churn, so its motion matches the in-window pet
   instead of sliding on the window's pixel grid. It also adopts the exact grab cursor used by DSH by
   capturing the rendered pet's cursor at runtime (no separate cursor asset), together with the same
-  drag-resistance wobble. Chat reactions stay in sync on the desktop (the thinking bubble appears
+  drag-resistance wobble and the crossed-out (X) eyes while the pet is held. Chat reactions stay in
+  sync on the desktop (the thinking bubble appears
   while a turn is running).
   **Smart Hide** keeps the pet on the desktop only instead of above other applications. The native
   helper exits with DSH; on non-Windows the menu items are absent and the host refuses to start the
