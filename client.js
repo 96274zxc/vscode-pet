@@ -1212,14 +1212,19 @@ function getChatPetColorPalette(color) {
 
 const coloredSpriteCache = new Map()
 let coloredSpritePixels = 0
-const MAX_CACHED_SPRITE_PIXELS = 2 * 1024 * 1024
+const MAX_CACHED_SPRITE_PIXELS = 1024 * 1024
 
 function getChatPetColoredSprite(image, color) {
 	if (isDefaultChatPetColor(color)) return image
 	const source = image.getAttribute('src')
 	const key = `${source}:${image.naturalWidth}x${image.naturalHeight}:${color}`
 	const cached = coloredSpriteCache.get(key)
-	if (cached) return cached
+	if (cached) {
+		// Refresh the insertion order so the cache behaves as LRU, not FIFO.
+		coloredSpriteCache.delete(key)
+		coloredSpriteCache.set(key, cached)
+		return cached
+	}
 	const canvas = document.createElement('canvas')
 	canvas.width = image.naturalWidth
 	canvas.height = image.naturalHeight
@@ -1787,6 +1792,28 @@ function getChatPetCachedImage(url) {
 	return chatPetLoadedImages.get(url)
 }
 
+function releaseChatPetAccessoryImages(keepUrl) {
+	const sources = new Set()
+	for (const accessory of Object.values(CHAT_PET_ACCESSORIES)) {
+		const source = getChatPetAccessoryImageSource(accessory)
+		if (!source?.url || source.url === keepUrl) continue
+		sources.add(source.url)
+		chatPetLoadedImages.delete(source.url)
+		chatPetImageCache.delete(source.url)
+		chatPetImageFailures.delete(source.url)
+	}
+	if (sources.size === 0) return
+	for (const [key, canvas] of coloredSpriteCache) {
+		let release = false
+		for (const source of sources) {
+			if (key.startsWith(`${source}:`)) { release = true; break }
+		}
+		if (!release) continue
+		coloredSpriteCache.delete(key)
+		coloredSpritePixels -= canvas.width * canvas.height
+	}
+}
+
 /* 45-desktop.js */
 /* Windows desktop display: platform gate, desktop geometry, frame bundles and the client bridge. */
 
@@ -2018,10 +2045,21 @@ function getChatPetDesktopModel() {
 }
 
 function getChatPetDesktopMenuLabels(t) {
+	let revision = 0
+	try { revision = typeof chatPetLocaleRevision === 'number' ? chatPetLocaleRevision : 0 } catch (ignored) { revision = 0 }
+	let lang = ''
+	try { lang = document?.documentElement?.lang ?? '' } catch (ignored) { lang = '' }
+	const key = `${revision}|${lang}`
+	if (chatPetDesktopLabelsCache && chatPetDesktopLabelsKey === key) return chatPetDesktopLabelsCache
 	const labels = {}
-	for (const key of CHAT_PET_DESKTOP_MENU_LABEL_KEYS) labels[key] = translateChatPetText(t, key)
+	for (const labelKey of CHAT_PET_DESKTOP_MENU_LABEL_KEYS) labels[labelKey] = translateChatPetText(t, labelKey)
+	chatPetDesktopLabelsKey = key
+	chatPetDesktopLabelsCache = labels
 	return labels
 }
+
+let chatPetDesktopLabelsCache
+let chatPetDesktopLabelsKey
 
 let chatPetDesktopThemeCanvas
 
@@ -2066,7 +2104,7 @@ function blendDesktopThemeColor(top, bottom) {
 	}
 }
 
-function getChatPetDesktopTheme() {
+function computeChatPetDesktopTheme() {
 	const darkPalette = {
 		dark: true,
 		menuBackground: '#26272b',
@@ -2120,6 +2158,28 @@ function getChatPetDesktopTheme() {
 	} catch (ignored) {
 		return darkPalette
 	}
+}
+
+let chatPetDesktopThemeCache
+let chatPetDesktopThemeCheckedAt = 0
+
+function sameChatPetDesktopTheme(a, b) {
+	return a.dark === b.dark
+		&& a.menuBackground === b.menuBackground
+		&& a.menuText === b.menuText
+		&& a.menuMuted === b.menuMuted
+		&& a.menuHover === b.menuHover
+		&& a.menuBorder === b.menuBorder
+		&& a.accent === b.accent
+}
+
+function getChatPetDesktopTheme() {
+	const now = Date.now()
+	if (chatPetDesktopThemeCache && now - chatPetDesktopThemeCheckedAt < 2000) return chatPetDesktopThemeCache
+	chatPetDesktopThemeCheckedAt = now
+	const next = computeChatPetDesktopTheme()
+	if (!chatPetDesktopThemeCache || !sameChatPetDesktopTheme(chatPetDesktopThemeCache, next)) chatPetDesktopThemeCache = next
+	return chatPetDesktopThemeCache
 }
 
 /* ---------------------------------------------------------------- painter */
@@ -2340,6 +2400,8 @@ class ChatPetDesktopBridge {
 		this._startToken = 0
 		this._warmupRequested = false
 		this._lastSettings = undefined
+		this._sentTheme = undefined
+		this._sentLabels = undefined
 		this._startTimer = undefined
 		this._pollAbort = undefined
 		this._frames = undefined
@@ -2493,16 +2555,20 @@ class ChatPetDesktopBridge {
 		const session = this.active ? this.session : this._preparedSession
 		if (!session) return
 		const current = this._getFacts()
+		const themeChanged = current.theme !== this._sentTheme
+		const labelsChanged = current.labels !== this._sentLabels
+		this._sentTheme = current.theme
+		this._sentLabels = current.labels
 		const payload = {
 			running: facts?.running === true,
 			pendingInteraction: facts?.pendingInteraction === true,
 			hasInput: current.hasInput,
 			canceled: current.canceled,
 			inputRevision: current.inputRevision,
-			// The facts timer is also the live theme/label sync: without these
-			// the helper would keep the palette/labels captured at prepare time.
-			theme: current.theme,
-			labels: current.labels,
+			// Theme/labels only when the cached objects changed; the helper keeps
+			// the last values otherwise (the initial bundle/show always carries them).
+			...(themeChanged ? { theme: current.theme } : {}),
+			...(labelsChanged ? { labels: current.labels } : {}),
 		}
 		if (facts?.grabbing === true || current.grabbing) payload.grabbing = true
 		const petRect = facts?.petRect ?? current.petRect
@@ -2556,6 +2622,7 @@ class ChatPetDesktopBridge {
 
 	_buildBundle(frames) {
 		const prefs = this.prefs.get()
+		const facts = this._getFacts()
 		return {
 			protocol: CHAT_PET_DESKTOP_PROTOCOL,
 			frameKey: getChatPetDesktopFrameKey(prefs),
@@ -2566,9 +2633,9 @@ class ChatPetDesktopBridge {
 				horizontal: prefs.desktopHorizontal ?? null,
 				motionReduced: this._motionReduced(),
 			},
-			facts: this._getFacts(),
-			labels: getChatPetDesktopMenuLabels(this.getT()),
-			theme: getChatPetDesktopTheme(),
+			facts,
+			labels: facts.labels,
+			theme: facts.theme,
 			model: getChatPetDesktopModel(),
 			windowRect: getChatPetDesktopWindowRect(),
 			states: frames.states,
@@ -2817,6 +2884,14 @@ class ChatPetDesktopBridge {
 		if (session) this._request('/stop', { method: 'POST', body: JSON.stringify({ session, dispose: true }) }).catch(() => {})
 		this._request('/dispose', { method: 'POST' }).catch(() => {})
 		this.controller?.cancelDesktopSuspend?.()
+		this._frames = undefined
+		this._frameKey = undefined
+		this._framePromise = undefined
+		this._framePromiseKey = undefined
+		this._preparePromise = undefined
+		this._prepareKey = undefined
+		this._preparedSession = undefined
+		this._lastSettings = undefined
 		if (activeChatPetDesktopBridge === this) activeChatPetDesktopBridge = undefined
 	}
 }
@@ -2913,6 +2988,8 @@ class ChatPetController {
 		this._deathPosition = undefined
 		this._respawnPosition = undefined
 		this._jumpGame = undefined
+		this._preloadIdle = undefined
+		this._preloadIsIdle = false
 		this._build()
 		this._bind()
 		this._observeMotion()
@@ -3086,6 +3163,7 @@ class ChatPetController {
 	}
 
 	async _preload() {
+		if (this.disposed) return
 		const sources = getChatPetSpriteSources(this.variant)
 		const urls = new Set()
 		for (const entry of Object.values(sources)) {
@@ -3098,10 +3176,29 @@ class ChatPetController {
 		const respawn = getChatPetRespawnSources(this.variant)
 		urls.add(respawn.animated.url)
 		urls.add(respawn.reducedMotion.url)
-		for (const accessory of Object.values(CHAT_PET_ACCESSORIES)) urls.add(getChatPetAccessoryImageSource(accessory).url)
-		const run = () => { for (const url of urls) loadChatPetImage(url).catch(() => {}) }
-		if (typeof requestIdleCallback === 'function') requestIdleCallback(run, { timeout: 1200 })
-		else setTimeout(run, 50)
+		// Only the worn accessory is prefetched; the hats panel previews load
+		// their own accessory images on demand and release them when closed.
+		const wornAccessory = this.accessoryId ? getChatPetAccessoryById(this.accessoryId) : undefined
+		if (wornAccessory) urls.add(getChatPetAccessoryImageSource(wornAccessory).url)
+		const run = () => {
+			this._preloadIdle = undefined
+			if (this.disposed) return
+			for (const url of urls) loadChatPetImage(url).catch(() => {})
+		}
+		if (typeof requestIdleCallback === 'function') {
+			this._preloadIsIdle = true
+			this._preloadIdle = requestIdleCallback(run, { timeout: 1200 })
+		} else {
+			this._preloadIsIdle = false
+			this._preloadIdle = setTimeout(run, 50)
+		}
+	}
+
+	_cancelPreload() {
+		if (this._preloadIdle === undefined) return
+		if (this._preloadIsIdle && typeof cancelIdleCallback === 'function') cancelIdleCallback(this._preloadIdle)
+		else clearTimeout(this._preloadIdle)
+		this._preloadIdle = undefined
 	}
 
 	/* --------------------------------------------------------------- layout */
@@ -4524,6 +4621,7 @@ class ChatPetController {
 		this._mutationObserver?.disconnect()
 		for (const remove of this._listeners ?? []) remove()
 		if (this._motionQuery?.removeEventListener && this._motionListener) this._motionQuery.removeEventListener('change', this._motionListener)
+		this._cancelPreload()
 		this._jumpGame?.destroy()
 		this.root.remove()
 	}
@@ -4795,6 +4893,11 @@ function HatsPanel(props) {
 	const { controller, onTab, t } = props
 	const prefs = useBlobbyPrefs()
 	const variant = getChatPetColorVariant(prefs.color)
+	React.useEffect(() => () => {
+		const accessoryId = chatPetPrefs.get().accessory
+		const worn = accessoryId ? getChatPetAccessoryById(accessoryId) : undefined
+		releaseChatPetAccessoryImages(worn ? getChatPetAccessoryImageSource(worn).url : undefined)
+	}, [])
 	const hats = CHAT_PET_ACHIEVEMENTS
 		.filter(achievement => achievement.accessory)
 		.map(achievement => getChatPetAccessoryById(achievement.accessory))
@@ -5105,6 +5208,8 @@ function PetSlot(props) {
 		desktopBridgeRef.current = desktopBridge
 		desktopBridge.init()
 		return () => {
+			clearTimeout(statusTimer.current)
+			statusTimer.current = undefined
 			if (desktopBridgeRef.current === desktopBridge) desktopBridgeRef.current = null
 			desktopBridge.dispose()
 			if (activeBlobbyController === controller) activeBlobbyController = null
@@ -5784,8 +5889,8 @@ function getChatPetMemorySnapshot() {
 function installChatPetDebugApi() {
 	let enabled = false
 	try { enabled = new URLSearchParams(location.search).get('blobbyDebug') === '1' || localStorage.getItem(CHAT_PET_DEBUG_KEY) === '1' } catch (ignored) { /* noop */ }
-	if (!enabled) return
-	window.__dshBlobby = {
+	if (!enabled) return undefined
+	const api = {
 		getSnapshot: () => activeBlobbyController?.getSnapshot(),
 		setFacts: facts => activeBlobbyController?.setFacts(facts),
 		showState: state => activeBlobbyController?._showTransientState(state),
@@ -5798,6 +5903,10 @@ function installChatPetDebugApi() {
 		memory: () => getChatPetMemorySnapshot(),
 		get controller() { return activeBlobbyController },
 		get desktop() { return activeChatPetDesktopBridge },
+	}
+	window.__dshBlobby = api
+	return () => {
+		if (window.__dshBlobby === api) delete window.__dshBlobby
 	}
 }
 

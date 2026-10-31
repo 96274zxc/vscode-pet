@@ -58,8 +58,8 @@ function getChatPetMemorySnapshot() {
 function installChatPetDebugApi() {
 	let enabled = false
 	try { enabled = new URLSearchParams(location.search).get('blobbyDebug') === '1' || localStorage.getItem(CHAT_PET_DEBUG_KEY) === '1' } catch (ignored) { /* noop */ }
-	if (!enabled) return
-	window.__dshBlobby = {
+	if (!enabled) return undefined
+	const api = {
 		getSnapshot: () => activeBlobbyController?.getSnapshot(),
 		setFacts: facts => activeBlobbyController?.setFacts(facts),
 		showState: state => activeBlobbyController?._showTransientState(state),
@@ -72,6 +72,10 @@ function installChatPetDebugApi() {
 		memory: () => getChatPetMemorySnapshot(),
 		get controller() { return activeBlobbyController },
 		get desktop() { return activeChatPetDesktopBridge },
+	}
+	window.__dshBlobby = api
+	return () => {
+		if (window.__dshBlobby === api) delete window.__dshBlobby
 	}
 }
 

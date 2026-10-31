@@ -89,6 +89,8 @@ class ChatPetController {
 		this._deathPosition = undefined
 		this._respawnPosition = undefined
 		this._jumpGame = undefined
+		this._preloadIdle = undefined
+		this._preloadIsIdle = false
 		this._build()
 		this._bind()
 		this._observeMotion()
@@ -262,6 +264,7 @@ class ChatPetController {
 	}
 
 	async _preload() {
+		if (this.disposed) return
 		const sources = getChatPetSpriteSources(this.variant)
 		const urls = new Set()
 		for (const entry of Object.values(sources)) {
@@ -274,10 +277,29 @@ class ChatPetController {
 		const respawn = getChatPetRespawnSources(this.variant)
 		urls.add(respawn.animated.url)
 		urls.add(respawn.reducedMotion.url)
-		for (const accessory of Object.values(CHAT_PET_ACCESSORIES)) urls.add(getChatPetAccessoryImageSource(accessory).url)
-		const run = () => { for (const url of urls) loadChatPetImage(url).catch(() => {}) }
-		if (typeof requestIdleCallback === 'function') requestIdleCallback(run, { timeout: 1200 })
-		else setTimeout(run, 50)
+		// Only the worn accessory is prefetched; the hats panel previews load
+		// their own accessory images on demand and release them when closed.
+		const wornAccessory = this.accessoryId ? getChatPetAccessoryById(this.accessoryId) : undefined
+		if (wornAccessory) urls.add(getChatPetAccessoryImageSource(wornAccessory).url)
+		const run = () => {
+			this._preloadIdle = undefined
+			if (this.disposed) return
+			for (const url of urls) loadChatPetImage(url).catch(() => {})
+		}
+		if (typeof requestIdleCallback === 'function') {
+			this._preloadIsIdle = true
+			this._preloadIdle = requestIdleCallback(run, { timeout: 1200 })
+		} else {
+			this._preloadIsIdle = false
+			this._preloadIdle = setTimeout(run, 50)
+		}
+	}
+
+	_cancelPreload() {
+		if (this._preloadIdle === undefined) return
+		if (this._preloadIsIdle && typeof cancelIdleCallback === 'function') cancelIdleCallback(this._preloadIdle)
+		else clearTimeout(this._preloadIdle)
+		this._preloadIdle = undefined
 	}
 
 	/* --------------------------------------------------------------- layout */
@@ -1700,6 +1722,7 @@ class ChatPetController {
 		this._mutationObserver?.disconnect()
 		for (const remove of this._listeners ?? []) remove()
 		if (this._motionQuery?.removeEventListener && this._motionListener) this._motionQuery.removeEventListener('change', this._motionListener)
+		this._cancelPreload()
 		this._jumpGame?.destroy()
 		this.root.remove()
 	}
