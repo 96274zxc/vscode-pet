@@ -219,6 +219,9 @@ function normalizeFrameList(frames, durations, label, width, height) {
 function normalizeStateEntry(raw, state) {
 	if (!isRecord(raw)) throw httpError(400, `desktop state ${state} is invalid`)
 	const right = normalizeFrameList(raw.right, raw.durations, `state ${state}`, raw.width, raw.height)
+	const frameIndices = Array.isArray(raw.frameIndices)
+		? raw.frameIndices.slice(0, right.frames.length).map((value, index) => readRequiredNumber(value, `desktop state ${state} frame index ${index} is invalid`, 0, 100000))
+		: undefined
 	const output = {
 		width: right.width,
 		height: right.height,
@@ -226,6 +229,7 @@ function normalizeStateEntry(raw, state) {
 		loop: readBoolean(raw.loop, false),
 		mirror: raw.mirror !== false,
 		right: right.frames,
+		...(frameIndices ? { frameIndices } : {}),
 	}
 	if (output.mirror === false) {
 		const left = normalizeFrameList(raw.left, raw.durations, `state ${state} left`, raw.width, raw.height)

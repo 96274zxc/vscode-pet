@@ -498,6 +498,7 @@ namespace BlobbyDesktop
 		public int Width = 96;
 		public int Height = 96;
 		public double[] Durations = new double[0];
+		public int[] FrameIndices = new int[0];
 		public bool Loop;
 		public bool Mirror = true;
 		public BitmapSource[] Right = new BitmapSource[0];
@@ -537,6 +538,19 @@ namespace BlobbyDesktop
 			animation.Durations = values.ToArray();
 			int count = Math.Max(1, JsonRead.GetInt(meta, "count", animation.Durations.Length));
 			animation.Right = LoadFrames(Path.Combine(framesDir, name), count);
+			object[] frameIndices = JsonRead.AsArray(meta.ContainsKey("frameIndices") ? meta["frameIndices"] : null);
+			if (frameIndices != null && frameIndices.Length > 0)
+			{
+				List<int> indices = new List<int>();
+				foreach (object value in frameIndices) indices.Add(Math.Max(0, (int)JsonRead.Number(value, 0)));
+				animation.FrameIndices = indices.ToArray();
+			}
+			else
+			{
+				int[] generated = new int[count];
+				for (int index = 0; index < count; index++) generated[index] = index;
+				animation.FrameIndices = generated;
+			}
 			if (!animation.Mirror)
 			{
 				int leftCount = Math.Max(1, JsonRead.GetInt(meta, "leftCount", count));

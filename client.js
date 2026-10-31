@@ -2287,6 +2287,7 @@ async function renderChatPetDesktopPayload(options) {
 			width: entry.width,
 			height: entry.height,
 			durations: entry.frames.map(frame => frame.duration || 0),
+			frameIndices: entry.frames.map(frame => frame.index),
 			loop: entry.loop,
 			mirror: entry.mirror,
 			right: rendered.right,

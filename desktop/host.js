@@ -552,6 +552,7 @@ export class DesktopHelperManager {
 				mirror: entry.mirror,
 				count: entry.right.length,
 			}
+			if (Array.isArray(entry.frameIndices)) meta.frameIndices = entry.frameIndices
 			if (entry.mirror === false) {
 				const leftDir = join(framesDir, `${state}-left`)
 				await this.fs.mkdir(leftDir, { recursive: true })

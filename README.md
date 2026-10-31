@@ -67,12 +67,15 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   intervals, matching the window's ChatPetBlinkController and disabled under reduced motion. The pupil
   gaze is mirrored with nine pre-baked eye overlays (the eye box covered with the body color and the
   pupil shifted by up to 2 display px), selected from the cursor direction for the tracking poses
-  and skipped while blinking/dragging; the mouse-bounce counter is an accent pill at the pet's
-  top-right (5s or until the next throw) and 20+ bounces spawn the same 24-particle confetti burst
-  (window temporarily grows to fit it; reduced motion skips the confetti). Remaining known
-  differences: the desktop never falls to a respawn death (taskbar floor), the jump game opens in
-  DSH, the DSH port does not track achievements, and the VS Code-only painting/searching states and
-  keyboard hop do not apply. The facing follows the cursor only in the idle pose; sleeping, waking,
+  and skipped while blinking/dragging. The overlays use each animation frame's source index for the
+  bobbed-eye offset (the payload carries `frameIndices`, e.g. idle [0,20]), and when the pet faces
+  left the horizontal gaze component is flipped in the overlay source to cancel the pet image's
+  mirror, so the pupil still moves toward the screen-space cursor like the window's unmirrored eye
+  overlay. The mouse-bounce counter is an accent pill at the pet's top-right (5s or until the next
+  throw) and 20+ bounces spawn the same 24-particle confetti burst (window temporarily grows to fit
+  it; reduced motion skips the confetti). Remaining known differences: the desktop never falls to a
+  respawn death (taskbar floor), the jump game opens in DSH, the DSH port does not track
+  achievements, and the VS Code-only painting/searching states and keyboard hop do not apply. The facing follows the cursor only in the idle pose; sleeping, waking,
   typing, rendering, clapping and reaction poses keep the direction they had when they started,
   matching the window's ChatPetFacingController.
   **Smart Hide** keeps the pet on the desktop only instead of above other applications. The native

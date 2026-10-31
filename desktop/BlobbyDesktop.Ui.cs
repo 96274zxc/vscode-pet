@@ -1108,7 +1108,10 @@ namespace BlobbyDesktop
 
 		private bool IsEyesBobbed()
 		{
-			return (_currentState == "idle" || _currentState == "rendering" || _currentState == "achievementUnlocked") && _frameIndex >= 20;
+			if (_currentState != "idle" && _currentState != "rendering" && _currentState != "achievementUnlocked") return false;
+			if (_currentAnimation == null || _currentAnimation.FrameIndices.Length == 0) return false;
+			int index = Math.Max(0, Math.Min(_frameIndex, _currentAnimation.FrameIndices.Length - 1));
+			return _currentAnimation.FrameIndices[index] >= 20;
 		}
 
 		private void PositionEyeOverlay(Image overlay)
@@ -1206,12 +1209,15 @@ namespace BlobbyDesktop
 			int gy = distance > 0 ? (int)Math.Floor(deltaY / distance + 0.5) : 0;
 			gx = Math.Max(-1, Math.Min(1, gx));
 			gy = Math.Max(-1, Math.Min(1, gy));
-			if (gx != _gazeX || gy != _gazeY)
-			{
-				_gazeX = gx;
-				_gazeY = gy;
-				_gazeImage.Source = _manifest.Gaze.Right[(gy + 1) * 3 + (gx + 1)];
-			}
+			_gazeX = gx;
+			_gazeY = gy;
+			// The overlay inherits the pet image's left-facing mirror, while the
+			// window's eye overlay is never mirrored and only swaps the two eye
+			// boxes. Compensate the horizontal pupil offset so it still moves
+			// toward the screen-space cursor.
+			int sourceGx = _facing == "left" ? -gx : gx;
+			BitmapSource source = _manifest.Gaze.Right[(gy + 1) * 3 + (sourceGx + 1)];
+			if (!ReferenceEquals(_gazeImage.Source, source)) _gazeImage.Source = source;
 			_gazeImage.Visibility = Visibility.Visible;
 			PositionEyeOverlay(_gazeImage);
 		}
