@@ -64,12 +64,17 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   when cancelled), dizzy after quick cursor wiggles, reduced-motion variants, and eyes during the
   typing/buttonPress/love poses. The periodic blink is implemented as a tiny transparent eye
   overlay (body-colored pupil covers + the 2px clipped pupil lines) shown for 260ms at 1.4–3.4s
-  intervals, matching the window's ChatPetBlinkController and disabled under reduced motion.
-  Remaining known differences: the desktop never falls to a respawn death (taskbar floor), the jump
-  game opens in DSH, the DSH port does not track achievements, and cursor-following pupils, the
-  bounce counter and 20-bounce confetti are not baked into the desktop frames. The facing follows
-  the cursor only in the idle pose; sleeping, waking, typing, rendering, clapping and reaction poses
-  keep the direction they had when they started, matching the window's ChatPetFacingController.
+  intervals, matching the window's ChatPetBlinkController and disabled under reduced motion. The pupil
+  gaze is mirrored with nine pre-baked eye overlays (the eye box covered with the body color and the
+  pupil shifted by up to 2 display px), selected from the cursor direction for the tracking poses
+  and skipped while blinking/dragging; the mouse-bounce counter is an accent pill at the pet's
+  top-right (5s or until the next throw) and 20+ bounces spawn the same 24-particle confetti burst
+  (window temporarily grows to fit it; reduced motion skips the confetti). Remaining known
+  differences: the desktop never falls to a respawn death (taskbar floor), the jump game opens in
+  DSH, the DSH port does not track achievements, and the VS Code-only painting/searching states and
+  keyboard hop do not apply. The facing follows the cursor only in the idle pose; sleeping, waking,
+  typing, rendering, clapping and reaction poses keep the direction they had when they started,
+  matching the window's ChatPetFacingController.
   **Smart Hide** keeps the pet on the desktop only instead of above other applications. The native
   helper exits with DSH; on non-Windows the menu items are absent and the host refuses to start the
   helper, and the plain Web GUI hides the items as well.

@@ -2246,6 +2246,28 @@ function renderChatPetDesktopBlink(color) {
 	}
 }
 
+function renderChatPetDesktopGaze(color) {
+	// Nine pupil overlays for the eight directions + center. Each covers the
+	// eye box with the body color and draws the pupil shifted by up to 4 frame
+	// px (= 2 display px, the same translate the window applies).
+	const body = getChatPetBodyColor(color)
+	const eye = getChatPetEyeColor(color)
+	const frames = []
+	for (let dy = -1; dy <= 1; dy++) {
+		for (let dx = -1; dx <= 1; dx++) {
+			const { canvas, context } = createChatPetDesktopCanvas(96, 96)
+			context.fillStyle = body
+			context.fillRect(36, 60, 16, 24)
+			context.fillRect(60, 60, 16, 24)
+			context.fillStyle = eye
+			context.fillRect(40 + dx * 4, 64 + dy * 4, 8, 16)
+			context.fillRect(64 + dx * 4, 64 + dy * 4, 8, 16)
+			frames.push(canvas.toDataURL('image/png'))
+		}
+	}
+	return { width: 96, height: 96, durations: frames.map(() => 0), loop: false, frames }
+}
+
 async function renderChatPetDesktopPayload(options) {
 	const { variant, color, accessoryId } = options
 	const plan = getChatPetDesktopFramePlan(variant)
@@ -2274,7 +2296,8 @@ async function renderChatPetDesktopPayload(options) {
 	const bubble = await renderChatPetDesktopEffect(variant, color, 'bubble')
 	const respawn = await renderChatPetDesktopEffect(variant, color, 'respawn')
 	const blink = renderChatPetDesktopBlink(color)
-	return { states, bubble, respawn, blink }
+	const gaze = renderChatPetDesktopGaze(color)
+	return { states, bubble, respawn, blink, gaze }
 }
 
 /* ---------------------------------------------------------------- bridge */

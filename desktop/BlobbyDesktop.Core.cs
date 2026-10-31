@@ -441,6 +441,7 @@ namespace BlobbyDesktop
 		public DesktopAnimation Bubble;
 		public DesktopAnimation Respawn;
 		public DesktopAnimation Blink;
+		public DesktopAnimation Gaze;
 		public int ParentPid;
 		public string SessionDir;
 		public string FramesDir;
@@ -480,6 +481,7 @@ namespace BlobbyDesktop
 			manifest.Bubble = DesktopAnimation.Load(manifest.FramesDir, "bubble", JsonRead.GetObject(root, "bubble"));
 			manifest.Respawn = DesktopAnimation.Load(manifest.FramesDir, "respawn", JsonRead.GetObject(root, "respawn"));
 			if (root.ContainsKey("blink")) manifest.Blink = DesktopAnimation.Load(manifest.FramesDir, "blink", JsonRead.GetObject(root, "blink"));
+			if (root.ContainsKey("gaze")) manifest.Gaze = DesktopAnimation.Load(manifest.FramesDir, "gaze", JsonRead.GetObject(root, "gaze"));
 			return manifest;
 		}
 

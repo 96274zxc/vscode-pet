@@ -13,6 +13,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
 using System.Windows.Threading;
 
 namespace BlobbyDesktop
@@ -445,7 +446,10 @@ namespace BlobbyDesktop
 		private Canvas _canvas;
 		private Canvas _petHost;
 		private Image _petImage;
+		private Image _gazeImage;
 		private Image _blinkImage;
+		private int _gazeX;
+		private int _gazeY;
 		private bool _blinking;
 		private long _blinkAt;
 		private long _blinkUntil;
@@ -453,6 +457,25 @@ namespace BlobbyDesktop
 		private Image _bubbleImage;
 		private Border _menuBorder;
 		private StackPanel _menuStack;
+		private Canvas _confettiHost;
+		private Border _bounceBadge;
+		private TextBlock _bounceLabel;
+		private int _bounceCount;
+		private long _bounceResetAt;
+		private readonly List<ConfettiParticle> _confetti = new List<ConfettiParticle>();
+
+		private sealed class ConfettiParticle
+		{
+			public Rectangle Element;
+			public double BurstX;
+			public double BurstY;
+			public double ScreenX;
+			public double ScreenY;
+			public long Start;
+			public long Delay;
+			public double Dx;
+			public double Dy;
+		}
 		private HwndSource _source;
 		private DispatcherTimer _timer;
 		private IntPtr _hwnd;
@@ -711,6 +734,13 @@ namespace BlobbyDesktop
 			_petImage.Stretch = Stretch.Fill;
 			RenderOptions.SetBitmapScalingMode(_petImage, BitmapScalingMode.NearestNeighbor);
 			_petHost.Children.Add(_petImage);
+			_gazeImage = new Image();
+			_gazeImage.Stretch = Stretch.Fill;
+			_gazeImage.Visibility = Visibility.Hidden;
+			_gazeImage.IsHitTestVisible = false;
+			RenderOptions.SetBitmapScalingMode(_gazeImage, BitmapScalingMode.NearestNeighbor);
+			if (_manifest.Gaze != null && _manifest.Gaze.Right.Length >= 9) _gazeImage.Source = _manifest.Gaze.Right[4];
+			_petHost.Children.Add(_gazeImage);
 			_blinkImage = new Image();
 			_blinkImage.Stretch = Stretch.Fill;
 			_blinkImage.Visibility = Visibility.Hidden;
@@ -719,6 +749,25 @@ namespace BlobbyDesktop
 			if (_manifest.Blink != null && _manifest.Blink.Right.Length > 0) _blinkImage.Source = _manifest.Blink.Right[0];
 			_petHost.Children.Add(_blinkImage);
 			_canvas.Children.Add(_petHost);
+			_confettiHost = new Canvas();
+			_confettiHost.IsHitTestVisible = false;
+			_canvas.Children.Add(_confettiHost);
+			_bounceBadge = new Border();
+			_bounceBadge.CornerRadius = new CornerRadius(12);
+			_bounceBadge.Background = new SolidColorBrush(_manifest.Theme.Accent);
+			_bounceBadge.Padding = new Thickness(6, 0, 6, 0);
+			_bounceBadge.Height = 24;
+			_bounceBadge.MinWidth = 24;
+			_bounceBadge.Visibility = Visibility.Hidden;
+			_bounceBadge.IsHitTestVisible = false;
+			_bounceLabel = new TextBlock();
+			_bounceLabel.FontSize = 11;
+			_bounceLabel.FontWeight = FontWeights.SemiBold;
+			_bounceLabel.Foreground = Brushes.White;
+			_bounceLabel.HorizontalAlignment = HorizontalAlignment.Center;
+			_bounceLabel.VerticalAlignment = VerticalAlignment.Center;
+			_bounceBadge.Child = _bounceLabel;
+			_canvas.Children.Add(_bounceBadge);
 			_menuBorder = new Border();
 			_menuBorder.Visibility = Visibility.Hidden;
 			_menuBorder.CornerRadius = new CornerRadius(10);
@@ -900,6 +949,13 @@ namespace BlobbyDesktop
 				if (_menuDip.Right > right) right = _menuDip.Right;
 				if (_menuDip.Bottom > bottom) bottom = _menuDip.Bottom;
 			}
+			foreach (ConfettiParticle particle in _confetti)
+			{
+				if (particle.BurstX - 84 < left) left = particle.BurstX - 84;
+				if (particle.BurstY - 144 < top) top = particle.BurstY - 144;
+				if (particle.BurstX + 84 > right) right = particle.BurstX + 84;
+				if (particle.BurstY + 4 > bottom) bottom = particle.BurstY + 4;
+			}
 			double newLeft = Math.Round(left);
 			double newTop = Math.Round(top);
 			double newWidth = Math.Max(1, Math.Round(right - left));
@@ -944,6 +1000,8 @@ namespace BlobbyDesktop
 				Canvas.SetTop(_portalImage, _petTop - _contentTop);
 			}
 			if (_bubbleImage != null && _bubbleImage.Visibility == Visibility.Visible) PositionBubble();
+			PositionBounceBadge();
+			PositionConfetti();
 			if (_menuOpen) PositionMenu();
 		}
 
@@ -961,6 +1019,8 @@ namespace BlobbyDesktop
 				Canvas.SetTop(_portalImage, _petTop - _contentTop);
 			}
 			PositionBubble();
+			PositionBounceBadge();
+			PositionConfetti();
 			if (_menuOpen) PositionMenu();
 		}
 
@@ -1042,7 +1102,8 @@ namespace BlobbyDesktop
 			_petImage.RenderTransform = mirrored ? new ScaleTransform(-1, 1) : Transform.Identity;
 			_petHost.Width = _displaySize;
 			_petHost.Height = _displaySize;
-			if (_blinkImage != null) UpdateBlinkPosition();
+			PositionEyeOverlay(_gazeImage);
+			PositionEyeOverlay(_blinkImage);
 		}
 
 		private bool IsEyesBobbed()
@@ -1050,16 +1111,16 @@ namespace BlobbyDesktop
 			return (_currentState == "idle" || _currentState == "rendering" || _currentState == "achievementUnlocked") && _frameIndex >= 20;
 		}
 
-		private void UpdateBlinkPosition()
+		private void PositionEyeOverlay(Image overlay)
 		{
-			if (_blinkImage == null || _petImage == null) return;
-			_blinkImage.Width = _petImage.Width;
-			_blinkImage.Height = _petImage.Height;
-			Canvas.SetLeft(_blinkImage, Canvas.GetLeft(_petImage));
+			if (overlay == null || _petImage == null) return;
+			overlay.Width = _petImage.Width;
+			overlay.Height = _petImage.Height;
+			Canvas.SetLeft(overlay, Canvas.GetLeft(_petImage));
 			double bob = IsEyesBobbed() ? 4.0 * _petImage.Height / 96.0 : 0;
-			Canvas.SetTop(_blinkImage, Canvas.GetTop(_petImage) + bob);
-			_blinkImage.RenderTransformOrigin = new Point(0.5, 0.5);
-			_blinkImage.RenderTransform = _petImage.RenderTransform;
+			Canvas.SetTop(overlay, Canvas.GetTop(_petImage) + bob);
+			overlay.RenderTransformOrigin = new Point(0.5, 0.5);
+			overlay.RenderTransform = _petImage.RenderTransform;
 		}
 
 		private bool IsBlinkableState()
@@ -1116,7 +1177,156 @@ namespace BlobbyDesktop
 		{
 			_blinking = blinking;
 			if (_blinkImage != null) _blinkImage.Visibility = blinking ? Visibility.Visible : Visibility.Hidden;
-			if (blinking) UpdateBlinkPosition();
+			if (blinking) PositionEyeOverlay(_blinkImage);
+		}
+
+		private bool IsGazeState()
+		{
+			return _currentState == "idle" || _currentState == "rendering" || _currentState == "achievementUnlocked"
+				|| _currentState == "clapping" || _currentState == "yapping";
+		}
+
+		private void UpdateGaze()
+		{
+			if (_gazeImage == null || _manifest.Gaze == null || _manifest.Gaze.Right.Length < 9) return;
+			bool tracking = IsGazeState() && !_state.Dragging && !_state.OnTheRun && _phase == Phase.Resting && !_blinking;
+			if (!tracking)
+			{
+				_gazeImage.Visibility = Visibility.Hidden;
+				return;
+			}
+			Native.POINT cursor;
+			if (!Native.GetCursorPos(out cursor)) return;
+			double cursorX = (cursor.X - _monitorPhysical.Left) / _dpiScale;
+			double cursorY = (cursor.Y - _monitorPhysical.Top) / _dpiScale;
+			double deltaX = cursorX - (_petLeft + _displaySize / 2.0);
+			double deltaY = cursorY - (_petTop + _displaySize / 2.0);
+			double distance = Math.Sqrt(deltaX * deltaX + deltaY * deltaY);
+			int gx = distance > 0 ? (int)Math.Floor(deltaX / distance + 0.5) : 0;
+			int gy = distance > 0 ? (int)Math.Floor(deltaY / distance + 0.5) : 0;
+			gx = Math.Max(-1, Math.Min(1, gx));
+			gy = Math.Max(-1, Math.Min(1, gy));
+			if (gx != _gazeX || gy != _gazeY)
+			{
+				_gazeX = gx;
+				_gazeY = gy;
+				_gazeImage.Source = _manifest.Gaze.Right[(gy + 1) * 3 + (gx + 1)];
+			}
+			_gazeImage.Visibility = Visibility.Visible;
+			PositionEyeOverlay(_gazeImage);
+		}
+
+		private void ShowBounceBadge(long now)
+		{
+			if (_bounceBadge == null) return;
+			_bounceLabel.Text = _bounceCount.ToString();
+			_bounceBadge.Visibility = Visibility.Visible;
+			_bounceResetAt = now + (long)Math.Max(0, _model.Physics.BounceResult);
+			PositionBounceBadge();
+		}
+
+		private void UpdateBounce(long now)
+		{
+			if (_bounceBadge == null) return;
+			if (_bounceBadge.Visibility == Visibility.Visible && _bounceResetAt > 0 && now >= _bounceResetAt) ResetBounceCount();
+			PositionBounceBadge();
+		}
+
+		private void ResetBounceCount()
+		{
+			_bounceCount = 0;
+			_bounceResetAt = 0;
+			if (_bounceBadge != null) _bounceBadge.Visibility = Visibility.Hidden;
+			if (_bounceLabel != null) _bounceLabel.Text = "";
+		}
+
+		private void PositionBounceBadge()
+		{
+			if (_bounceBadge == null || _bounceBadge.Visibility != Visibility.Visible) return;
+			_bounceBadge.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+			double width = Math.Max(24, _bounceBadge.DesiredSize.Width);
+			double left = _petLeft + _displaySize - width * 0.25;
+			double top = _petTop - 12;
+			Canvas.SetLeft(_bounceBadge, left - _contentLeft);
+			Canvas.SetTop(_bounceBadge, top - _contentTop);
+		}
+
+		private void SpawnConfetti(long now)
+		{
+			if (_settings.MotionReduced || _confettiHost == null) return;
+			if (_confetti.Count > 240) return;
+			double centerX = _petLeft + _displaySize / 2.0;
+			double centerY = _petTop + _displaySize / 2.0;
+			Color[] colors = new Color[]
+			{
+				(Color)ColorConverter.ConvertFromString("#ffcd0f"),
+				(Color)ColorConverter.ConvertFromString("#23a8f2"),
+				(Color)ColorConverter.ConvertFromString("#e6536f"),
+				(Color)ColorConverter.ConvertFromString("#55b85a"),
+				(Color)ColorConverter.ConvertFromString("#a277e6"),
+			};
+			for (int index = 0; index < 24; index++)
+			{
+				Rectangle bit = new Rectangle();
+				bit.Width = 4;
+				bit.Height = 4;
+				bit.Fill = new SolidColorBrush(colors[index % colors.Length]);
+				bit.IsHitTestVisible = false;
+				bit.RenderTransformOrigin = new Point(0.5, 0.5);
+				bit.Visibility = Visibility.Hidden;
+				_confettiHost.Children.Add(bit);
+				_confetti.Add(new ConfettiParticle
+				{
+					Element = bit,
+					BurstX = centerX,
+					BurstY = centerY,
+					Start = now,
+					Delay = (long)(_random.NextDouble() * 120),
+					Dx = (_random.NextDouble() - 0.5) * 160,
+					Dy = -40 - _random.NextDouble() * 100,
+				});
+			}
+			LayoutWindow(true);
+		}
+
+		private void UpdateConfetti(long now)
+		{
+			if (_confetti.Count == 0) return;
+			bool removed = false;
+			for (int index = _confetti.Count - 1; index >= 0; index--)
+			{
+				ConfettiParticle particle = _confetti[index];
+				double elapsed = now - particle.Start - particle.Delay;
+				if (elapsed < 0) continue;
+				double progress = elapsed / 900.0;
+				if (progress >= 1)
+				{
+					if (particle.Element != null && _confettiHost != null) _confettiHost.Children.Remove(particle.Element);
+					_confetti.RemoveAt(index);
+					removed = true;
+					continue;
+				}
+				double eased = 1 - Math.Pow(1 - progress, 2);
+				particle.ScreenX = particle.BurstX + particle.Dx * eased;
+				particle.ScreenY = particle.BurstY + particle.Dy * eased;
+				Canvas.SetLeft(particle.Element, particle.ScreenX - _contentLeft);
+				Canvas.SetTop(particle.Element, particle.ScreenY - _contentTop);
+				particle.Element.RenderTransform = new RotateTransform(240 * progress);
+				particle.Element.Opacity = 1 - progress;
+				particle.Element.Visibility = Visibility.Visible;
+			}
+			if (removed) LayoutWindow(true);
+		}
+
+		private void PositionConfetti()
+		{
+			if (_confettiHost == null) return;
+			foreach (ConfettiParticle particle in _confetti)
+			{
+				if (particle.Element == null || particle.Element.Visibility != Visibility.Visible) continue;
+				Canvas.SetLeft(particle.Element, particle.ScreenX - _contentLeft);
+				Canvas.SetTop(particle.Element, particle.ScreenY - _contentTop);
+			}
 		}
 
 		private void PositionBubble()
@@ -1159,6 +1369,9 @@ namespace BlobbyDesktop
 			else if (_phase == Phase.Resting) UpdateResting(now);
 			UpdateAnimation(now, delta);
 			UpdateFacing(now);
+			UpdateGaze();
+			UpdateBounce(now);
+			UpdateConfetti(now);
 			UpdateBubble(now, delta);
 			UpdateTransforms(now);
 			CheckForeground(now);
@@ -1525,6 +1738,9 @@ namespace BlobbyDesktop
 			_mouseBounceAvailableAt = now + (long)_model.Physics.MouseBounceReleaseGrace;
 			_airborneStart = now;
 			SetRenderedState("falling", now);
+			_bounceCount++;
+			ShowBounceBadge(now);
+			if (_bounceCount >= 20) SpawnConfetti(now);
 		}
 
 		private void Land(double left, long now)
@@ -1694,7 +1910,7 @@ namespace BlobbyDesktop
 			}
 			else
 			{
-				BeginThrow(0, 0, Now());
+				BeginThrow(0, 0, Now(), true);
 			}
 		}
 
@@ -1719,8 +1935,9 @@ namespace BlobbyDesktop
 			return new double[] { vx * scale, vy * scale };
 		}
 
-		private void BeginThrow(double vx, double vy, long now)
+		private void BeginThrow(double vx, double vy, long now, bool preserveBounceCount = false)
 		{
+			if (!preserveBounceCount) ResetBounceCount();
 			_phase = Phase.Airborne;
 			_airborne = true;
 			_state.Airborne = true;
@@ -2031,6 +2248,7 @@ namespace BlobbyDesktop
 			if (_menuBorder == null) return;
 			_menuBorder.Background = new SolidColorBrush(_manifest.Theme.Background);
 			_menuBorder.BorderBrush = new SolidColorBrush(_manifest.Theme.Border);
+			if (_bounceBadge != null) _bounceBadge.Background = new SolidColorBrush(_manifest.Theme.Accent);
 		}
 
 		private void ApplyFactsVisuals()
@@ -2509,6 +2727,9 @@ namespace BlobbyDesktop
 				status["state"] = _currentState;
 				status["facing"] = _facing;
 				status["blinking"] = _blinking;
+				status["gaze"] = new object[] { _gazeX, _gazeY };
+				status["bounce"] = _bounceCount;
+				status["confetti"] = _confetti.Count;
 				status["uptime"] = now;
 				status["ticks"] = _tickCount;
 				status["scale"] = _settings.Scale;
@@ -2597,6 +2818,7 @@ namespace BlobbyDesktop
 		}
 	}
 }
+
 
 
 

@@ -258,8 +258,9 @@ export function validateDesktopBundle(raw) {
 	const bubble = normalizeEffect(raw.bubble, 'bubble')
 	const respawn = normalizeEffect(raw.respawn, 'respawn')
 	const blink = isRecord(raw.blink) ? normalizeEffect(raw.blink, 'blink') : undefined
+	const gaze = isRecord(raw.gaze) ? normalizeEffect(raw.gaze, 'gaze') : undefined
 	if (totalBytes > DESKTOP_MAX_BUNDLE_BYTES) throw httpError(400, 'desktop bundle is too large')
-	return { protocol: DESKTOP_PROTOCOL, frameKey, settings, facts, labels, theme, model, windowRect, states, bubble, respawn, ...(blink ? { blink } : {}) }
+	return { protocol: DESKTOP_PROTOCOL, frameKey, settings, facts, labels, theme, model, windowRect, states, bubble, respawn, ...(blink ? { blink } : {}), ...(gaze ? { gaze } : {}) }
 }
 
 function normalizeEffect(raw, label) {
