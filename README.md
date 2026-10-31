@@ -65,7 +65,9 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   typing/buttonPress/love poses. Remaining known differences: the desktop never falls to a respawn
   death (taskbar floor), the jump game opens in DSH, the DSH port does not track achievements, and
   the periodic blink, cursor-following pupils, bounce counter and 20-bounce confetti are not baked
-  into the desktop frames.
+  into the desktop frames. The facing follows the cursor only in the idle pose; sleeping, waking,
+  typing, rendering, clapping and reaction poses keep the direction they had when they started,
+  matching the window's ChatPetFacingController.
   **Smart Hide** keeps the pet on the desktop only instead of above other applications. The native
   helper exits with DSH; on non-Windows the menu items are absent and the host refuses to start the
   helper, and the plain Web GUI hides the items as well.

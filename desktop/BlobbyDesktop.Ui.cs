@@ -1222,6 +1222,11 @@ namespace BlobbyDesktop
 			if (_phase == Phase.Airborne) return;
 			if (_phase != Phase.Resting && _phase != Phase.Dragging) return;
 			if (_state.Dragging) return;
+			if (_state.OnTheRun) return;
+			// ChatPetFacingController only tracks the cursor in the idle pose;
+			// sleep/waking/typing/rendering/clapping and the reaction states keep
+			// the direction they had when they started.
+			if (_currentState != "idle") return;
 			Native.POINT cursor;
 			if (!Native.GetCursorPos(out cursor)) return;
 			double cursorX = (cursor.X - _monitorPhysical.Left) / _dpiScale;
@@ -2414,6 +2419,7 @@ namespace BlobbyDesktop
 				Dictionary<string, object> status = new Dictionary<string, object>();
 				status["phase"] = _phase.ToString().ToLowerInvariant();
 				status["state"] = _currentState;
+				status["facing"] = _facing;
 				status["uptime"] = now;
 				status["ticks"] = _tickCount;
 				status["scale"] = _settings.Scale;

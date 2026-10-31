@@ -53,6 +53,8 @@ thinking 气泡。主图为 144×144（插件卡片 36px 的 4 倍），`icons/i
   **buttonPress**、快速来回划动触发的 dizzy、减少动态效果的变体，以及 typing/buttonPress/love
   姿势下的眼睛。仍然保留的差异：桌面不触发坠落重生（任务栏是地板）、跳跳乐会回到 DSH 内打开、
   DSH 移植版不追踪成就，以及周期眨眼、瞳孔跟随光标、弹跳计数和 20 次弹跳彩带不会烘焙进桌面帧。
+  朝向只在 idle 姿势下跟随鼠标；sleep/waking/typing/rendering/clapping 和点击反应状态会保持进入该
+  姿势时的方向，与窗口内的 ChatPetFacingController 一致。
   开启**智能隐藏**后，
   Blobby 只显示在桌面，不置顶在其他应用前。原生 helper 随 DSH 退出；非 Windows 环境下不显示这些
   菜单项，Host 也拒绝启动桌面显示；Web 版同样隐藏这些菜单项。
