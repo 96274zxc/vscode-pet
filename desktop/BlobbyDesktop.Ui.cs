@@ -27,8 +27,17 @@ namespace BlobbyDesktop
 		public const int IDC_WAIT = 32514;
 		public const int IDC_CROSS = 32515;
 		public const int IDC_UPARROW = 32516;
+		public const int IDC_SIZENWSE = 32642;
+		public const int IDC_SIZENESW = 32643;
+		public const int IDC_SIZEWE = 32644;
+		public const int IDC_SIZENS = 32645;
+		public const int IDC_SIZEALL = 32646;
+		public const int IDC_NO = 32648;
 		public const int IDC_APPSTARTING = 32650;
 		public const int IDC_HAND = 32649;
+		public const int IDC_HELP = 32651;
+		public const int IDC_PIN = 32671;
+		public const int IDC_PERSON = 32672;
 		public const int WM_LBUTTONDOWN = 0x0201;
 		public const int WM_RBUTTONDOWN = 0x0204;
 		public const int WM_MBUTTONDOWN = 0x0207;
@@ -779,18 +788,12 @@ namespace BlobbyDesktop
 			_lastCursorCapture = now;
 			Native.POINT point;
 			if (!Native.GetCursorPos(out point)) return;
-			if (_facts.HasPetRect)
-			{
-				if (point.X < _facts.PetLeft || point.Y < _facts.PetTop) return;
-				if (point.X > _facts.PetLeft + _facts.PetWidth || point.Y > _facts.PetTop + _facts.PetHeight) return;
-			}
-			else
-			{
-				if (_dshWindow == IntPtr.Zero || !Native.IsWindowVisible(_dshWindow)) return;
-				Native.RECT dshRect;
-				if (!Native.GetWindowRect(_dshWindow, out dshRect)) return;
-				if (point.X < dshRect.Left || point.Y < dshRect.Top || point.X > dshRect.Right || point.Y > dshRect.Bottom) return;
-			}
+			// Only sample inside the in-window pet's own rectangle. Sampling the
+			// whole DSH window used to pick up unrelated browser cursors such as
+			// the sidebar's col-resize (←||→) cursor.
+			if (!_facts.HasPetRect) return;
+			if (point.X < _facts.PetLeft || point.Y < _facts.PetTop) return;
+			if (point.X > _facts.PetLeft + _facts.PetWidth || point.Y > _facts.PetTop + _facts.PetHeight) return;
 			Native.CURSORINFO info = new Native.CURSORINFO();
 			info.cbSize = Marshal.SizeOf(typeof(Native.CURSORINFO));
 			if (!Native.GetCursorInfo(ref info) || info.hCursor == IntPtr.Zero) return;
@@ -811,7 +814,12 @@ namespace BlobbyDesktop
 
 		private static bool IsSystemCursor(IntPtr handle)
 		{
-			int[] ids = new int[] { Native.IDC_ARROW, Native.IDC_IBEAM, Native.IDC_WAIT, Native.IDC_CROSS, Native.IDC_UPARROW, Native.IDC_APPSTARTING };
+			int[] ids = new int[]
+			{
+				Native.IDC_ARROW, Native.IDC_IBEAM, Native.IDC_WAIT, Native.IDC_CROSS, Native.IDC_UPARROW,
+				Native.IDC_SIZENWSE, Native.IDC_SIZENESW, Native.IDC_SIZEWE, Native.IDC_SIZENS, Native.IDC_SIZEALL,
+				Native.IDC_NO, Native.IDC_HAND, Native.IDC_APPSTARTING, Native.IDC_HELP, Native.IDC_PIN, Native.IDC_PERSON,
+			};
 			foreach (int id in ids)
 			{
 				if (Native.LoadCursor(IntPtr.Zero, new IntPtr(id)) == handle) return true;
