@@ -499,6 +499,11 @@ namespace BlobbyDesktop
 
 		private bool _menuOpen;
 		private Native.RECT _menuDip;
+		private bool _menuWindowFixed;
+		private double _menuWindowLeft;
+		private double _menuWindowTop;
+		private double _menuWindowWidth;
+		private double _menuWindowHeight;
 		private long _lastPeekAt;
 		private long _peekUntil;
 		private long _splatUntil;
@@ -856,6 +861,15 @@ namespace BlobbyDesktop
 		private void LayoutWindow(bool force)
 		{
 			if (_window == null || _geometry == null) return;
+			if (_menuOpen && _menuWindowFixed)
+			{
+				_contentLeft = _menuWindowLeft;
+				_contentTop = _menuWindowTop;
+				_contentWidth = _menuWindowWidth;
+				_contentHeight = _menuWindowHeight;
+				if (force) PositionPetAndLayers();
+				return;
+			}
 			double padX = _padX;
 			double padTop = _padTop;
 			double baseLeft = _petLeft - padX;
@@ -1688,21 +1702,60 @@ namespace BlobbyDesktop
 			_menuDip.Bottom = (int)Math.Round(top + height);
 			_menuOpen = true;
 			_menuBorder.Width = width;
-			// Grow and move the window while the menu is still hidden, then show it
-			// already positioned. Showing before the window resize made the menu
-			// flash at its old origin for one frame.
-			LayoutWindow(true);
+			// Lock one window rect that already covers the pet at the maximum
+			// scale plus the menu. Growing/shrinking then only moves the pet
+			// inside that fixed window instead of resizing/moving the layered
+			// window on every click, which caused the menu to jitter.
+			LockMenuWindow();
 			_menuBorder.Measure(new Size(width, double.PositiveInfinity));
-			_menuBorder.Arrange(new Rect(0, 0, width, Math.Max(40, _menuBorder.DesiredSize.Height)));
 			_canvas.UpdateLayout();
 			_menuBorder.Visibility = Visibility.Visible;
 			InstallMouseHook();
+		}
+
+		private void LockMenuWindow()
+		{
+			DesktopAnimation animation = _currentAnimation ?? AnimationFor("idle");
+			double maxScale = 8;
+			double maxDisplay = _model.Sizes.Display * maxScale;
+			double frameWidth = animation == null ? maxDisplay : animation.Width / 2.0 * maxScale;
+			double frameHeight = animation == null ? maxDisplay : animation.Height / 2.0 * maxScale;
+			double maxPadX = Math.Max(0, frameWidth - maxDisplay) + maxDisplay * 0.5 + 8;
+			double maxPadTop = Math.Max(32 * maxScale, Math.Max(0, frameHeight - maxDisplay)) + maxDisplay * 0.5 + 8;
+			double maxPetLeft = Math.Max(_geometry.Left, Math.Min(_geometry.Right - maxDisplay, _petLeft));
+			double maxPetTop = _geometry.FloorY - maxDisplay;
+			double left = Math.Min(Math.Min(_petLeft - _padX, maxPetLeft - maxPadX), _menuDip.Left);
+			double top = Math.Min(Math.Min(_petTop - _padTop, maxPetTop - maxPadTop), _menuDip.Top);
+			double right = Math.Max(Math.Max(_petLeft + _displaySize + _padX, maxPetLeft + maxDisplay + maxPadX), _menuDip.Right);
+			double bottom = Math.Max(Math.Max(_petTop + _displaySize, maxPetTop + maxDisplay), _menuDip.Bottom);
+			_menuWindowLeft = Math.Round(left);
+			_menuWindowTop = Math.Round(top);
+			_menuWindowWidth = Math.Max(1, Math.Round(right - left));
+			_menuWindowHeight = Math.Max(1, Math.Round(bottom - top));
+			_menuWindowFixed = true;
+			_contentLeft = _menuWindowLeft;
+			_contentTop = _menuWindowTop;
+			_contentWidth = _menuWindowWidth;
+			_contentHeight = _menuWindowHeight;
+			_window.Width = _contentWidth;
+			_window.Height = _contentHeight;
+			int x = (int)Math.Round(_monitorPhysical.Left + _contentLeft * _dpiScale);
+			int y = (int)Math.Round(_monitorPhysical.Top + _contentTop * _dpiScale);
+			int pixelWidth = (int)Math.Round(_contentWidth * _dpiScale);
+			int pixelHeight = (int)Math.Round(_contentHeight * _dpiScale);
+			_lastWindowX = x;
+			_lastWindowY = y;
+			_lastWindowWidth = pixelWidth;
+			_lastWindowHeight = pixelHeight;
+			if (_hwnd != IntPtr.Zero) Native.PlaceWindow(_hwnd, x, y, pixelWidth, pixelHeight);
+			PositionPetAndLayers();
 		}
 
 		private void CloseMenu()
 		{
 			if (!_menuOpen) return;
 			_menuOpen = false;
+			_menuWindowFixed = false;
 			_menuBorder.Visibility = Visibility.Hidden;
 			UninstallMouseHook();
 			LayoutWindow(true);
@@ -1713,7 +1766,7 @@ namespace BlobbyDesktop
 			return new SolidColorBrush(color);
 		}
 
-		private Border CreateMenuRow(string label, bool checkedState, bool enabled, Action action)
+		private Border CreateMenuRow(string label, bool checkedState, bool enabled, Action action, bool rightAlign = false, bool checkable = false)
 		{
 			Border row = new Border();
 			row.CornerRadius = new CornerRadius(6);
@@ -1723,7 +1776,6 @@ namespace BlobbyDesktop
 			row.Tag = label;
 			Grid grid = new Grid();
 			grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-			grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 			TextBlock text = new TextBlock();
 			text.Text = label;
 			text.FontSize = 13;
@@ -1731,16 +1783,21 @@ namespace BlobbyDesktop
 			text.Foreground = Brush(enabled ? _manifest.Theme.Text : _manifest.Theme.Muted);
 			text.VerticalAlignment = VerticalAlignment.Center;
 			text.TextTrimming = TextTrimming.CharacterEllipsis;
+			text.TextAlignment = rightAlign ? TextAlignment.Right : TextAlignment.Left;
 			Grid.SetColumn(text, 0);
-			TextBlock check = new TextBlock();
-			check.Text = checkedState ? "\u2713" : "";
-			check.FontSize = 12;
-			check.Margin = new Thickness(8, 0, 0, 0);
-			check.Foreground = Brush(_manifest.Theme.Text);
-			check.VerticalAlignment = VerticalAlignment.Center;
-			Grid.SetColumn(check, 1);
 			grid.Children.Add(text);
-			grid.Children.Add(check);
+			if (checkable)
+			{
+				grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+				TextBlock check = new TextBlock();
+				check.Text = checkedState ? "\u2713" : "";
+				check.FontSize = 12;
+				check.Margin = new Thickness(8, 0, 0, 0);
+				check.Foreground = Brush(_manifest.Theme.Text);
+				check.VerticalAlignment = VerticalAlignment.Center;
+				Grid.SetColumn(check, 1);
+				grid.Children.Add(check);
+			}
 			row.Child = grid;
 			if (enabled)
 			{
@@ -1767,7 +1824,7 @@ namespace BlobbyDesktop
 			grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 			grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 			Border firstRow = CreateMenuRow(first, false, firstEnabled, firstAction);
-			Border secondRow = CreateMenuRow(second, false, secondEnabled, secondAction);
+			Border secondRow = CreateMenuRow(second, false, secondEnabled, secondAction, true);
 			Grid.SetColumn(firstRow, 0);
 			Grid.SetColumn(secondRow, 1);
 			grid.Children.Add(firstRow);
@@ -1790,8 +1847,8 @@ namespace BlobbyDesktop
 			_menuStack.Children.Add(CreateSeparator());
 			_menuStack.Children.Add(CreateMenuRow(_manifest.Label("menu.changeColor"), false, true, delegate { MenuCommand("color"); }));
 			_menuStack.Children.Add(CreateSeparator());
-			_menuStack.Children.Add(CreateMenuRow(_manifest.Label("menu.desktopDisplay"), true, true, delegate { DisableDesktopDisplay(); }));
-			_menuStack.Children.Add(CreateMenuRow(_manifest.Label("menu.smartHide"), _settings.SmartHide, true, delegate { ToggleSmartHide(); }));
+			_menuStack.Children.Add(CreateMenuRow(_manifest.Label("menu.desktopDisplay"), true, true, delegate { DisableDesktopDisplay(); }, false, true));
+			_menuStack.Children.Add(CreateMenuRow(_manifest.Label("menu.smartHide"), _settings.SmartHide, true, delegate { ToggleSmartHide(); }, false, true));
 		}
 
 		private Border CreateSeparator()
@@ -1854,10 +1911,11 @@ namespace BlobbyDesktop
 			double height = Math.Max(40, _menuBorder.DesiredSize.Height);
 			_menuDip.Right = (int)Math.Round(_menuDip.Left + width);
 			_menuDip.Bottom = (int)Math.Round(_menuDip.Top + height);
-			_menuBorder.Arrange(new Rect(0, 0, width, height));
 			_menuBorder.Visibility = Visibility.Visible;
-			_canvas.UpdateLayout();
 			LayoutWindow(true);
+			// LayoutWindow re-applies the menu's canvas position; update the
+			// layout afterwards so the menu is arranged at that position.
+			_canvas.UpdateLayout();
 		}
 
 		private void ApplyMenuTheme()

@@ -1,6 +1,6 @@
 {
   "name": "vscode-pet",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "type": "module",
   "license": "MIT",
   "icon": "./icon.svg",
@@ -67,5 +67,6 @@
     }
   }
 }
+
 
 
