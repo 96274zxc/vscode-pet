@@ -2726,6 +2726,14 @@ namespace BlobbyDesktop
 			_mouseHook = IntPtr.Zero;
 		}
 
+		private static void AccumulateFrameStats(DesktopAnimation animation, ref int loaded, ref int total, ref long bytes)
+		{
+			if (animation == null) return;
+			loaded += animation.LoadedFrameCount();
+			total += animation.TotalFrameCount();
+			bytes += animation.LoadedFrameBytes();
+		}
+
 		private void WriteStatus(long now)
 		{
 			if (now - _lastStatusWrite < 250) return;
@@ -2741,6 +2749,19 @@ namespace BlobbyDesktop
 				status["gaze"] = new object[] { _gazeX, _gazeY };
 				status["bounce"] = _bounceCount;
 				status["confetti"] = _confetti.Count;
+				int loadedFrames = 0;
+				int totalFrames = 0;
+				long frameBytes = 0;
+				foreach (DesktopAnimation animation in _manifest.States.Values) AccumulateFrameStats(animation, ref loadedFrames, ref totalFrames, ref frameBytes);
+				AccumulateFrameStats(_manifest.Bubble, ref loadedFrames, ref totalFrames, ref frameBytes);
+				AccumulateFrameStats(_manifest.Respawn, ref loadedFrames, ref totalFrames, ref frameBytes);
+				AccumulateFrameStats(_manifest.Blink, ref loadedFrames, ref totalFrames, ref frameBytes);
+				AccumulateFrameStats(_manifest.Gaze, ref loadedFrames, ref totalFrames, ref frameBytes);
+				Dictionary<string, object> frames = new Dictionary<string, object>();
+				frames["loaded"] = loadedFrames;
+				frames["total"] = totalFrames;
+				frames["bytes"] = frameBytes;
+				status["frames"] = frames;
 				status["uptime"] = now;
 				status["ticks"] = _tickCount;
 				status["scale"] = _settings.Scale;

@@ -372,7 +372,7 @@ function createChatPetDesktopCanvas(width, height) {
 	return { canvas, context }
 }
 
-function drawChatPetDesktopFrame(context, entry, bodyImage, accessoryImage, accessory, frame, color, facing) {
+function drawChatPetDesktopFrame(context, entry, bodyImage, accessoryImage, accessory, frame, color, facing, scratch) {
 	context.clearRect(0, 0, entry.width, entry.height)
 	drawChatPetComposite(
 		context,
@@ -391,7 +391,8 @@ function drawChatPetDesktopFrame(context, entry, bodyImage, accessoryImage, acce
 		color,
 	)
 	if (accessoryImage) {
-		const { canvas: eyeCanvas, context: eyeContext } = createChatPetDesktopCanvas(entry.width, entry.height)
+		const { canvas: eyeCanvas, context: eyeContext } = scratch ?? createChatPetDesktopCanvas(entry.width, entry.height)
+		eyeContext.clearRect(0, 0, entry.width, entry.height)
 		drawChatPetEyeAccessory(eyeContext, accessoryImage, entry.state, frame.index, facing, accessory?.eyeAccessoryMirrorsWithFacing !== false)
 		context.drawImage(eyeCanvas, 0, 0)
 	}
@@ -402,10 +403,11 @@ function renderChatPetDesktopStateFrames(entry, bodyImage, accessoryImage, acces
 	const facings = entry.mirror ? ['right'] : ['right', 'left']
 	const rendered = {}
 	for (const facing of facings) {
+		const { canvas, context } = createChatPetDesktopCanvas(entry.width, entry.height)
+		const scratch = accessoryImage ? createChatPetDesktopCanvas(entry.width, entry.height) : undefined
 		const frames = []
 		for (const frame of entry.frames) {
-			const { canvas, context } = createChatPetDesktopCanvas(entry.width, entry.height)
-			drawChatPetDesktopFrame(context, entry, bodyImage, accessoryImage, accessory, frame, color, facing)
+			drawChatPetDesktopFrame(context, entry, bodyImage, accessoryImage, accessory, frame, color, facing, scratch)
 			frames.push(canvas.toDataURL('image/png'))
 		}
 		rendered[facing] = frames
@@ -418,9 +420,10 @@ async function renderChatPetDesktopEffect(variant, color, kind) {
 	const source = sources.animated
 	const image = await loadChatPetImage(source.url)
 	const colored = getChatPetColoredSprite(image, color)
+	const { canvas, context } = createChatPetDesktopCanvas(96, 96)
 	const frames = []
 	for (let index = 0; index < source.frameCount; index++) {
-		const { canvas, context } = createChatPetDesktopCanvas(96, 96)
+		context.clearRect(0, 0, 96, 96)
 		context.drawImage(colored, index * 96, 0, 96, 96, 0, 0, 96, 96)
 		frames.push(canvas.toDataURL('image/png'))
 	}
@@ -463,9 +466,10 @@ function renderChatPetDesktopGaze(color) {
 	const body = getChatPetBodyColor(color)
 	const eye = getChatPetEyeColor(color)
 	const frames = []
+	const { canvas, context } = createChatPetDesktopCanvas(96, 96)
 	for (let dy = -1; dy <= 1; dy++) {
 		for (let dx = -1; dx <= 1; dx++) {
-			const { canvas, context } = createChatPetDesktopCanvas(96, 96)
+			context.clearRect(0, 0, 96, 96)
 			context.fillStyle = body
 			context.fillRect(36, 60, 16, 24)
 			context.fillRect(60, 60, 16, 24)

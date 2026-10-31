@@ -2162,7 +2162,7 @@ function createChatPetDesktopCanvas(width, height) {
 	return { canvas, context }
 }
 
-function drawChatPetDesktopFrame(context, entry, bodyImage, accessoryImage, accessory, frame, color, facing) {
+function drawChatPetDesktopFrame(context, entry, bodyImage, accessoryImage, accessory, frame, color, facing, scratch) {
 	context.clearRect(0, 0, entry.width, entry.height)
 	drawChatPetComposite(
 		context,
@@ -2181,7 +2181,8 @@ function drawChatPetDesktopFrame(context, entry, bodyImage, accessoryImage, acce
 		color,
 	)
 	if (accessoryImage) {
-		const { canvas: eyeCanvas, context: eyeContext } = createChatPetDesktopCanvas(entry.width, entry.height)
+		const { canvas: eyeCanvas, context: eyeContext } = scratch ?? createChatPetDesktopCanvas(entry.width, entry.height)
+		eyeContext.clearRect(0, 0, entry.width, entry.height)
 		drawChatPetEyeAccessory(eyeContext, accessoryImage, entry.state, frame.index, facing, accessory?.eyeAccessoryMirrorsWithFacing !== false)
 		context.drawImage(eyeCanvas, 0, 0)
 	}
@@ -2192,10 +2193,11 @@ function renderChatPetDesktopStateFrames(entry, bodyImage, accessoryImage, acces
 	const facings = entry.mirror ? ['right'] : ['right', 'left']
 	const rendered = {}
 	for (const facing of facings) {
+		const { canvas, context } = createChatPetDesktopCanvas(entry.width, entry.height)
+		const scratch = accessoryImage ? createChatPetDesktopCanvas(entry.width, entry.height) : undefined
 		const frames = []
 		for (const frame of entry.frames) {
-			const { canvas, context } = createChatPetDesktopCanvas(entry.width, entry.height)
-			drawChatPetDesktopFrame(context, entry, bodyImage, accessoryImage, accessory, frame, color, facing)
+			drawChatPetDesktopFrame(context, entry, bodyImage, accessoryImage, accessory, frame, color, facing, scratch)
 			frames.push(canvas.toDataURL('image/png'))
 		}
 		rendered[facing] = frames
@@ -2208,9 +2210,10 @@ async function renderChatPetDesktopEffect(variant, color, kind) {
 	const source = sources.animated
 	const image = await loadChatPetImage(source.url)
 	const colored = getChatPetColoredSprite(image, color)
+	const { canvas, context } = createChatPetDesktopCanvas(96, 96)
 	const frames = []
 	for (let index = 0; index < source.frameCount; index++) {
-		const { canvas, context } = createChatPetDesktopCanvas(96, 96)
+		context.clearRect(0, 0, 96, 96)
 		context.drawImage(colored, index * 96, 0, 96, 96, 0, 0, 96, 96)
 		frames.push(canvas.toDataURL('image/png'))
 	}
@@ -2253,9 +2256,10 @@ function renderChatPetDesktopGaze(color) {
 	const body = getChatPetBodyColor(color)
 	const eye = getChatPetEyeColor(color)
 	const frames = []
+	const { canvas, context } = createChatPetDesktopCanvas(96, 96)
 	for (let dy = -1; dy <= 1; dy++) {
 		for (let dx = -1; dx <= 1; dx++) {
-			const { canvas, context } = createChatPetDesktopCanvas(96, 96)
+			context.clearRect(0, 0, 96, 96)
 			context.fillStyle = body
 			context.fillRect(36, 60, 16, 24)
 			context.fillRect(60, 60, 16, 24)
@@ -5731,6 +5735,52 @@ function injectChatPetStyles() {
 	return () => style.remove()
 }
 
+function getChatPetMemorySnapshot() {
+	const controller = activeBlobbyController
+	const bridge = activeChatPetDesktopBridge
+	let heap
+	try {
+		const info = performance?.memory
+		if (info) heap = { used: info.usedJSHeapSize, total: info.totalJSHeapSize, limit: info.jsHeapSizeLimit }
+	} catch (ignored) { /* not chromium */ }
+	let dom = 0
+	try { dom = document.querySelectorAll('[class*="chat-pet-"]').length } catch (ignored) { /* noop */ }
+	let desktop
+	if (bridge) {
+		const snapshot = bridge.getSnapshot()
+		let framesBytes = 0
+		try { framesBytes = bridge._frames ? JSON.stringify(bridge._frames).length : 0 } catch (ignored) { /* noop */ }
+		desktop = { ...snapshot, framesBytes, preparedSession: bridge._preparedSession, frameKey: bridge._frameKey }
+	}
+	let jump
+	if (controller?._jumpGame) {
+		const game = controller._jumpGame
+		jump = { platforms: game.model?.platforms?.length, walls: game.model?.walls?.length, platformElements: game.platformElements?.size, wallElements: game.wallElements?.size }
+	}
+	return {
+		heap,
+		images: { loaded: chatPetLoadedImages.size, pending: chatPetImageCache.size, failed: chatPetImageFailures.size },
+		colored: { count: coloredSpriteCache.size, pixels: coloredSpritePixels },
+		desktop,
+		jump,
+		dom,
+		listeners: controller?._listeners?.length,
+		bridgeListeners: bridge?._listeners?.length,
+		timers: controller ? {
+			idle: Boolean(controller.idleTimer),
+			frame: Boolean(controller.frameTimer),
+			transient: Boolean(controller.transientTimer),
+			confirmation: Boolean(controller.confirmationTimer),
+			bounce: Boolean(controller.bounceTimer),
+			respawn: Boolean(controller.respawnTimer),
+			run: Boolean(controller._runTimer),
+			gazeRaf: controller._gazeRaf !== undefined,
+			preloadIdle: controller._preloadIdle !== undefined,
+		} : undefined,
+		observers: { resize: Boolean(controller?._resizeObserver), mutation: Boolean(controller?._mutationObserver) },
+	}
+}
+
 function installChatPetDebugApi() {
 	let enabled = false
 	try { enabled = new URLSearchParams(location.search).get('blobbyDebug') === '1' || localStorage.getItem(CHAT_PET_DEBUG_KEY) === '1' } catch (ignored) { /* noop */ }
@@ -5745,6 +5795,7 @@ function installChatPetDebugApi() {
 		startDesktop: () => activeChatPetDesktopBridge?.start(),
 		stopDesktop: () => activeChatPetDesktopBridge?.stop(),
 		getDesktop: () => activeChatPetDesktopBridge?.getSnapshot(),
+		memory: () => getChatPetMemorySnapshot(),
 		get controller() { return activeBlobbyController },
 		get desktop() { return activeChatPetDesktopBridge },
 	}

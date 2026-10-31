@@ -514,6 +514,30 @@ namespace BlobbyDesktop
 			get { return Right.Length == 0 ? 1 : Right.Length; }
 		}
 
+		public int LoadedFrameCount()
+		{
+			int count = 0;
+			if (Right != null)
+			{
+				for (int index = 0; index < Right.Length; index++) if (Right[index] != null) count++;
+			}
+			if (Left != null)
+			{
+				for (int index = 0; index < Left.Length; index++) if (Left[index] != null) count++;
+			}
+			return count;
+		}
+
+		public int TotalFrameCount()
+		{
+			return (Right == null ? 0 : Right.Length) + (Left == null ? 0 : Left.Length);
+		}
+
+		public long LoadedFrameBytes()
+		{
+			return (long)LoadedFrameCount() * Width * Height * 4;
+		}
+
 		public double TotalDuration
 		{
 			get
