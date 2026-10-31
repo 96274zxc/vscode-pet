@@ -2144,7 +2144,7 @@ function drawChatPetDesktopEyes(context, state, frameIndex, color, eyeState) {
 		}
 		return
 	}
-	if (!doesChatPetStateTrackCursor(resolved)) return
+	if (!doesChatPetStateTrackCursor(resolved) && !doesChatPetStateBlink(resolved, frameIndex)) return
 	const bobbed = (resolved === 'idle' || resolved === 'rendering' || resolved === 'achievementUnlocked') && frameIndex >= 20
 	const top = 64 + (bobbed ? 4 : 0)
 	context.fillStyle = getChatPetEyeColor(color)
@@ -2426,6 +2426,9 @@ class ChatPetDesktopBridge {
 		const facts = {
 			running: this.controller?.running === true,
 			pendingInteraction: this.controller?.pending === true,
+			hasInput: this.controller?.hasInput === true,
+			canceled: this.controller?.canceled === true,
+			inputRevision: Number.isFinite(this.controller?.inputRevision) ? this.controller.inputRevision : 0,
 			grabbing: this.controller?.dragging === true,
 			theme: getChatPetDesktopTheme(),
 			labels: getChatPetDesktopMenuLabels(this.getT()),
@@ -2442,6 +2445,13 @@ class ChatPetDesktopBridge {
 		const payload = {
 			running: facts?.running === true,
 			pendingInteraction: facts?.pendingInteraction === true,
+			hasInput: current.hasInput,
+			canceled: current.canceled,
+			inputRevision: current.inputRevision,
+			// The facts timer is also the live theme/label sync: without these
+			// the helper would keep the palette/labels captured at prepare time.
+			theme: current.theme,
+			labels: current.labels,
 		}
 		if (facts?.grabbing === true || current.grabbing) payload.grabbing = true
 		const petRect = facts?.petRect ?? current.petRect
@@ -2797,6 +2807,7 @@ class ChatPetController {
 		this.running = false
 		this.pending = false
 		this.hasInput = false
+		this.canceled = false
 		this.inputRevision = 0
 		this._lastInputRevision = 0
 		this.idleExpired = false
@@ -3176,7 +3187,11 @@ class ChatPetController {
 		this.running = facts.running === true
 		this.pending = facts.pendingInteraction === true
 		this.hasInput = facts.hasInput === true
-		if (nextInputRevision !== undefined) this._lastInputRevision = nextInputRevision
+		this.canceled = facts.canceled === true
+		if (nextInputRevision !== undefined) {
+			this.inputRevision = nextInputRevision
+			this._lastInputRevision = nextInputRevision
+		}
 		if (this._desktopSuspended) return
 		if (this.pending && !wasPending) {
 			this.confirmationExpired = false

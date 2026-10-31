@@ -103,6 +103,9 @@ export function normalizeDesktopFacts(raw) {
 	const facts = {
 		running: readBoolean(source.running, false),
 		pendingInteraction: readBoolean(source.pendingInteraction, false),
+		hasInput: readBoolean(source.hasInput, false),
+		canceled: readBoolean(source.canceled, false),
+		inputRevision: Math.floor(readNumber(source.inputRevision, 0, 0, 1000000000)),
 	}
 	if (readBoolean(source.grabbing, false)) facts.grabbing = true
 	if (isRecord(source.theme)) facts.theme = normalizeDesktopTheme(source.theme)

@@ -144,6 +144,11 @@ test('desktop settings, facts and commands normalize independently', () => {
 	assert.equal(cursorFacts.grabbing, true)
 	assert.deepEqual(cursorFacts.petRect, { left: 10, top: 20, width: 30, height: 40 })
 	assert.equal(normalizeDesktopFacts({ petRect: { left: 10, top: 20, width: 0, height: 40 } }).petRect, undefined)
+	const inputFacts = normalizeDesktopFacts({ hasInput: true, canceled: true, inputRevision: 3 })
+	assert.equal(inputFacts.hasInput, true)
+	assert.equal(inputFacts.canceled, true)
+	assert.equal(inputFacts.inputRevision, 3)
+	assert.equal(normalizeDesktopFacts({ inputRevision: -5 }).inputRevision, 0)
 	const visualFacts = normalizeDesktopFacts({
 		theme: { dark: false, menuBackground: '#ffffff', menuText: '#1f2329', menuMuted: '#6b7280', menuHover: '#f1f2f4', menuBorder: '#e3e5e8', accent: '#4d6bfe' },
 		labels: Object.fromEntries(LABEL_KEYS.map(key => [key, 'x-' + key])),

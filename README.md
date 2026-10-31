@@ -59,7 +59,13 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   drag-resistance wobble and the crossed-out (X) eyes while the pet is held (the same eye-overlay
   geometry as the in-window CSS, baked into the frames at the matching size). Chat reactions stay in
   sync on the desktop (the thinking bubble appears
-  while a turn is running).
+  while a turn is running). The desktop state machine also mirrors the window: typing while the
+  composer has input, waking when facts wake it, **buttonPress** when a request completes (silent
+  when cancelled), dizzy after quick cursor wiggles, reduced-motion variants, and eyes during the
+  typing/buttonPress/love poses. Remaining known differences: the desktop never falls to a respawn
+  death (taskbar floor), the jump game opens in DSH, the DSH port does not track achievements, and
+  the periodic blink, cursor-following pupils, bounce counter and 20-bounce confetti are not baked
+  into the desktop frames.
   **Smart Hide** keeps the pet on the desktop only instead of above other applications. The native
   helper exits with DSH; on non-Windows the menu items are absent and the host refuses to start the
   helper, and the plain Web GUI hides the items as well.

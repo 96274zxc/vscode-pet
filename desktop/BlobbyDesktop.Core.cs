@@ -186,6 +186,9 @@ namespace BlobbyDesktop
 	{
 		public bool Running;
 		public bool PendingInteraction;
+		public bool HasInput;
+		public bool Canceled;
+		public long InputRevision;
 		public bool Grabbing;
 		public bool HasPetRect;
 		public double PetLeft;
@@ -207,6 +210,9 @@ namespace BlobbyDesktop
 			if (source == null) return;
 			if (source.ContainsKey("running")) Running = JsonRead.GetBool(source, "running", Running);
 			if (source.ContainsKey("pendingInteraction")) PendingInteraction = JsonRead.GetBool(source, "pendingInteraction", PendingInteraction);
+			if (source.ContainsKey("hasInput")) HasInput = JsonRead.GetBool(source, "hasInput", HasInput);
+			if (source.ContainsKey("canceled")) Canceled = JsonRead.GetBool(source, "canceled", Canceled);
+			if (source.ContainsKey("inputRevision")) InputRevision = (long)Math.Max(0, JsonRead.GetNumber(source, "inputRevision", InputRevision));
 			if (source.ContainsKey("grabbing")) Grabbing = JsonRead.GetBool(source, "grabbing", Grabbing);
 			if (source.ContainsKey("theme")) Theme = DesktopTheme.From(JsonRead.GetObject(source, "theme"));
 			if (source.ContainsKey("labels"))
@@ -643,6 +649,9 @@ namespace BlobbyDesktop
 	{
 		public bool Running;
 		public bool PendingInteraction;
+		public bool HasInput;
+		public bool Canceled;
+		public long InputRevision;
 		public bool Sleeping;
 		public bool Dragging;
 		public bool Airborne;
@@ -658,6 +667,7 @@ namespace BlobbyDesktop
 			if (PendingInteraction) return PendingSince > 0 && now - PendingSince >= model.Timings.Confirmation ? "idle" : "clapping";
 			if (Running) return "rendering";
 			if (Sleeping) return "sleep";
+			if (HasInput) return "typing";
 			return "idle";
 		}
 
@@ -675,32 +685,47 @@ namespace BlobbyDesktop
 			return state == "rendering" || state == "achievementUnlocked";
 		}
 
-		public void SetFacts(DesktopFacts facts, DesktopModel model, long now)
+		public void SetFacts(DesktopFacts facts, DesktopModel model, long now, bool motionReduced = false)
 		{
+			bool wasRunning = Running;
 			bool wasBusy = Running || PendingInteraction;
+			bool hadInput = HasInput;
+			long previousRevision = InputRevision;
+			bool inputChanged = (facts.InputRevision > 0 && facts.InputRevision != previousRevision) || (facts.HasInput && !hadInput);
 			if (facts.PendingInteraction && !PendingInteraction) PendingSince = now;
 			if (!facts.PendingInteraction && PendingInteraction) PendingSince = 0;
 			Running = facts.Running;
 			PendingInteraction = facts.PendingInteraction;
+			HasInput = facts.HasInput;
+			Canceled = facts.Canceled;
+			InputRevision = facts.InputRevision;
 			bool busy = Running || PendingInteraction;
 			if (busy)
 			{
+				if (!wasBusy) Wake(now, model, true, motionReduced);
 				Sleeping = false;
 				IdleExpiredAt = 0;
-				if (!wasBusy) Wake(now, model, false);
 			}
 			else
 			{
 				ResetIdle(now, model);
 			}
+			// Same completion reaction as the in-window pet: a finished (not
+			// cancelled) request plays buttonPress. A cancelled request is silent.
+			if (wasRunning && !Running && !Canceled) ShowTransient("buttonPress", now, model);
+			if (inputChanged && !OnTheRun)
+			{
+				Wake(now, model, true, motionReduced);
+				ResetIdle(now, model);
+			}
 		}
 
-		public void Wake(long now, DesktopModel model, bool allowWaking)
+		public void Wake(long now, DesktopModel model, bool allowWaking, bool motionReduced = false)
 		{
 			bool wasSleeping = Sleeping || RenderState(model, now) == "sleep";
 			Sleeping = false;
 			ResetIdle(now, model);
-			if (allowWaking && wasSleeping)
+			if (allowWaking && !motionReduced && wasSleeping)
 			{
 				ShowTransient("waking", now, model);
 			}
@@ -740,7 +765,7 @@ namespace BlobbyDesktop
 			TransientUntil = 0;
 		}
 
-		public string Click(DesktopModel model, Random random, long now)
+		public string Click(DesktopModel model, Random random, long now, bool motionReduced = false)
 		{
 			double roll = random.NextDouble();
 			if (roll < model.Chances.Rare)
@@ -750,8 +775,9 @@ namespace BlobbyDesktop
 			}
 			if (roll < model.Chances.Rare + model.Chances.Yapping)
 			{
-				ShowTransient("yapping", now, model);
-				return "yapping";
+				string yap = motionReduced ? "yappingMouthOpen" : "yapping";
+				ShowTransient(yap, now, model);
+				return yap;
 			}
 			List<string> available = new List<string>();
 			foreach (string interaction in model.ClickInteractions)
@@ -792,6 +818,40 @@ namespace BlobbyDesktop
 				Sleeping = true;
 				IdleExpiredAt = 0;
 			}
+		}
+	}
+
+	internal sealed class DesktopDirectionChanges
+	{
+		private const int Threshold = 8;
+		private const long Interval = 600;
+		private readonly List<long> _changes = new List<long>();
+		private int _direction;
+
+		public bool Record(int direction, long now)
+		{
+			if (direction == 0 || direction == _direction) return false;
+			_direction = direction;
+			_changes.Add(now);
+			while (_changes.Count > 0 && now - _changes[0] > Interval) _changes.RemoveAt(0);
+			if (_changes.Count < Threshold) return false;
+			_changes.Clear();
+			return true;
+		}
+	}
+
+	internal sealed class FixedRandom : Random
+	{
+		private readonly double _value;
+
+		public FixedRandom(double value)
+		{
+			_value = value;
+		}
+
+		public override double NextDouble()
+		{
+			return _value;
 		}
 	}
 
@@ -930,11 +990,26 @@ namespace BlobbyDesktop
 			machine.SetFacts(new DesktopFacts { Running = true, PendingInteraction = false }, model, now);
 			Check(failures, "running renders", machine.RenderState(model, now) == "rendering", machine.RenderState(model, now));
 			checks.Add("state-rendering");
-			machine.SetFacts(new DesktopFacts { Running = false, PendingInteraction = true }, model, now + 100);
-			Check(failures, "pending claps", machine.RenderState(model, now + 100) == "clapping", machine.RenderState(model, now + 100));
+			DesktopStateMachine doneMachine = new DesktopStateMachine();
+			doneMachine.SetFacts(new DesktopFacts { Running = true }, model, now);
+			doneMachine.SetFacts(new DesktopFacts { Running = false, Canceled = false }, model, now + 1);
+			Check(failures, "completion presses button", doneMachine.RenderState(model, now + 2) == "buttonPress", doneMachine.RenderState(model, now + 2));
+			checks.Add("completion-button-press");
+			DesktopStateMachine cancelledMachine = new DesktopStateMachine();
+			cancelledMachine.SetFacts(new DesktopFacts { Running = true }, model, now);
+			cancelledMachine.SetFacts(new DesktopFacts { Running = false, Canceled = true }, model, now + 1);
+			Check(failures, "cancel is silent", cancelledMachine.RenderState(model, now + 2) == "idle", cancelledMachine.RenderState(model, now + 2));
+			checks.Add("cancel-is-silent");
+			DesktopStateMachine typingMachine = new DesktopStateMachine();
+			typingMachine.SetFacts(new DesktopFacts { HasInput = true, InputRevision = 1 }, model, now);
+			Check(failures, "input types", typingMachine.RenderState(model, now + 1) == "typing", typingMachine.RenderState(model, now + 1));
+			checks.Add("typing-has-input");
+			DesktopStateMachine pendingMachine = new DesktopStateMachine();
+			pendingMachine.SetFacts(new DesktopFacts { Running = false, PendingInteraction = true }, model, now + 100);
+			Check(failures, "pending claps", pendingMachine.RenderState(model, now + 100) == "clapping", pendingMachine.RenderState(model, now + 100));
 			checks.Add("state-clapping");
-			machine.SetFacts(new DesktopFacts { Running = false, PendingInteraction = true }, model, now + 2200);
-			Check(failures, "confirmation expires", machine.RenderState(model, now + 2201) == "idle", machine.RenderState(model, now + 2201));
+			pendingMachine.SetFacts(new DesktopFacts { Running = false, PendingInteraction = true }, model, now + 2200);
+			Check(failures, "confirmation expires", pendingMachine.RenderState(model, now + 2201) == "idle", pendingMachine.RenderState(model, now + 2201));
 			checks.Add("confirmation-expires");
 			machine.SetFacts(new DesktopFacts { Running = false, PendingInteraction = false }, model, now + 3000);
 			machine.ResetIdle(now + 3000, model);
@@ -944,6 +1019,23 @@ namespace BlobbyDesktop
 			machine.Wake(now + 3000 + (long)model.Timings.IdleSleep + 2, model, true);
 			Check(failures, "waking transient", machine.RenderState(model, now + 3000 + (long)model.Timings.IdleSleep + 2) == "waking", machine.RenderState(model, now + 3000 + (long)model.Timings.IdleSleep + 2));
 			checks.Add("wake-transient");
+			DesktopStateMachine factsWakeMachine = new DesktopStateMachine();
+			factsWakeMachine.SetFacts(new DesktopFacts(), model, now);
+			factsWakeMachine.ResetIdle(now, model);
+			factsWakeMachine.Update(now + (long)model.Timings.IdleSleep + 1, model);
+			Check(failures, "idle sleeps before facts wake", factsWakeMachine.RenderState(model, now + (long)model.Timings.IdleSleep + 1) == "sleep", factsWakeMachine.RenderState(model, now + (long)model.Timings.IdleSleep + 1));
+			factsWakeMachine.SetFacts(new DesktopFacts { Running = true }, model, now + (long)model.Timings.IdleSleep + 2);
+			Check(failures, "facts wake shows waking", factsWakeMachine.RenderState(model, now + (long)model.Timings.IdleSleep + 2) == "waking", factsWakeMachine.RenderState(model, now + (long)model.Timings.IdleSleep + 2));
+			checks.Add("facts-wake-waking");
+			DesktopStateMachine yapMachine = new DesktopStateMachine();
+			string yap = yapMachine.Click(model, new FixedRandom(0.015), now, true);
+			Check(failures, "reduced motion yapping", yap == "yappingMouthOpen" && yapMachine.RenderState(model, now + 1) == "yappingMouthOpen", yap);
+			checks.Add("reduced-motion-yapping");
+			DesktopDirectionChanges directionChanges = new DesktopDirectionChanges();
+			bool dizzy = false;
+			for (int index = 0; index < 8; index++) dizzy |= directionChanges.Record(index % 2 == 0 ? 1 : -1, now + index * 50);
+			Check(failures, "direction changes dizzy", dizzy, dizzy.ToString());
+			checks.Add("direction-dizzy");
 
 			DesktopStateMachine clickMachine = new DesktopStateMachine();
 			Random random = new Random(7);

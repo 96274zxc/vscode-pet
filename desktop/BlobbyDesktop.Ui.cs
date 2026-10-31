@@ -438,6 +438,7 @@ namespace BlobbyDesktop
 		private readonly DesktopStateMachine _state = new DesktopStateMachine();
 		private readonly Stopwatch _clock = Stopwatch.StartNew();
 		private readonly Random _random = new Random();
+		private readonly DesktopDirectionChanges _directionChanges = new DesktopDirectionChanges();
 		private readonly int _parentPid;
 
 		private Window _window;
@@ -545,7 +546,7 @@ namespace BlobbyDesktop
 			BuildWindow();
 			_startedAt = Now();
 			_lastTick = _startedAt;
-			_state.SetFacts(_facts, _model, _startedAt);
+			_state.SetFacts(_facts, _model, _startedAt, _settings.MotionReduced);
 			_state.OnTheRun = _settings.OnTheRun;
 			_state.ResetIdle(_startedAt, _model);
 			if (!_prepared) BeginStart();
@@ -1323,7 +1324,7 @@ namespace BlobbyDesktop
 				clip = new RectangleGeometry(new Rect(0, 0, _displaySize, Math.Max(1, visible)));
 				key = "run:" + (peeking ? 1 : 0);
 			}
-			else if (_state.Dragging)
+			else if (_state.Dragging && !_settings.MotionReduced)
 			{
 				long phase = (now / 120) % 2;
 				double direction = phase == 0 ? -1 : 1;
@@ -1528,6 +1529,18 @@ namespace BlobbyDesktop
 			double hoverX = hover.X + _contentLeft;
 			double hoverY = hover.Y + _contentTop;
 			if (!_dragging && !_dragCandidate) UpdateHoverCursor(IsInsidePet(hoverX, hoverY));
+			if (IsInsidePet(hoverX, hoverY) && !_state.OnTheRun)
+			{
+				// Same trigger as the in-window gaze: quickly wiggling across the
+				// pet's center makes it dizzy (8 direction changes per 600ms).
+				int direction = hoverX < _petLeft + _displaySize / 2 ? -1 : 1;
+				if (_directionChanges.Record(direction, Now()) && _state.Transient != "dizzy")
+				{
+					_state.Wake(Now(), _model, true, _settings.MotionReduced);
+					_state.ShowTransient("dizzy", Now(), _model);
+					_state.ResetIdle(Now(), _model);
+				}
+			}
 			if (!_dragCandidate) return;
 			if (e.LeftButton != MouseButtonState.Pressed) return;
 			Native.POINT cursor;
@@ -1540,6 +1553,7 @@ namespace BlobbyDesktop
 				_dragging = true;
 				_state.Dragging = true;
 				_phase = Phase.Dragging;
+				_state.Wake(Now(), _model, true, _settings.MotionReduced);
 				SetRenderedState(_state.RenderState(_model, Now()), Now());
 				SetPetVisibility(true);
 				SetBubbleVisibility(false);
@@ -1643,16 +1657,17 @@ namespace BlobbyDesktop
 			}
 			if (_state.Sleeping)
 			{
-				_state.Wake(now, _model, true);
+				_state.Wake(now, _model, true, _settings.MotionReduced);
 				_state.ResetIdle(now, _model);
 				return;
 			}
+			if (_state.Transient == "waking") return;
 			if (_state.Running || _state.PendingInteraction)
 			{
 				_state.ResetIdle(now, _model);
 				return;
 			}
-			_state.Click(_model, _random, now);
+			_state.Click(_model, _random, now, _settings.MotionReduced);
 			_state.ResetIdle(now, _model);
 		}
 
@@ -2085,7 +2100,7 @@ namespace BlobbyDesktop
 			if (type == "facts")
 			{
 				_facts.Apply(JsonRead.GetObject(message, "facts"));
-				_state.SetFacts(_facts, _model, Now());
+				_state.SetFacts(_facts, _model, Now(), _settings.MotionReduced);
 				ApplyFactsVisuals();
 				return;
 			}
@@ -2128,7 +2143,7 @@ namespace BlobbyDesktop
 			if (!_window.IsVisible) _window.Show();
 			_startedAt = Now();
 			_lastTick = _startedAt;
-			_state.SetFacts(_facts, _model, _startedAt);
+			_state.SetFacts(_facts, _model, _startedAt, _settings.MotionReduced);
 			_state.OnTheRun = _settings.OnTheRun;
 			_state.ResetIdle(_startedAt, _model);
 			BeginStart();
@@ -2487,6 +2502,7 @@ namespace BlobbyDesktop
 		}
 	}
 }
+
 
 
 

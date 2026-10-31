@@ -36,6 +36,7 @@ class ChatPetController {
 		this.running = false
 		this.pending = false
 		this.hasInput = false
+		this.canceled = false
 		this.inputRevision = 0
 		this._lastInputRevision = 0
 		this.idleExpired = false
@@ -415,7 +416,11 @@ class ChatPetController {
 		this.running = facts.running === true
 		this.pending = facts.pendingInteraction === true
 		this.hasInput = facts.hasInput === true
-		if (nextInputRevision !== undefined) this._lastInputRevision = nextInputRevision
+		this.canceled = facts.canceled === true
+		if (nextInputRevision !== undefined) {
+			this.inputRevision = nextInputRevision
+			this._lastInputRevision = nextInputRevision
+		}
 		if (this._desktopSuspended) return
 		if (this.pending && !wasPending) {
 			this.confirmationExpired = false
