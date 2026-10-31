@@ -1536,12 +1536,29 @@ namespace BlobbyDesktop
 			Native.POINT cursor;
 			if (!Native.GetCursorPos(out cursor)) return;
 			double cursorX = (cursor.X - _monitorPhysical.Left) / _dpiScale;
+			double cursorY = (cursor.Y - _monitorPhysical.Top) / _dpiScale;
 			double center = _petLeft + _displaySize / 2;
+			double centerY = _petTop + _displaySize / 2;
 			string next = cursorX < center ? "left" : "right";
 			if (next != _facing)
 			{
 				_facing = next;
 				UpdatePetImage(false);
+				// The in-window dizzy comes from facing changes while the cursor
+				// is being waved around the pet. The desktop pet has no window
+				// around it, so accept the wave anywhere within a generous radius
+				// instead of only when the cursor is over the 48px sprite.
+				const double DizzyRange = 240;
+				if (Math.Abs(cursorX - center) <= DizzyRange && Math.Abs(cursorY - centerY) <= DizzyRange)
+				{
+					int direction = next == "left" ? -1 : 1;
+					if (_directionChanges.Record(direction, now) && _state.Transient != "dizzy")
+					{
+						_state.Wake(now, _model, true, _settings.MotionReduced);
+						_state.ShowTransient("dizzy", now, _model);
+						_state.ResetIdle(now, _model);
+					}
+				}
 			}
 		}
 
@@ -1843,18 +1860,6 @@ namespace BlobbyDesktop
 			double hoverX = hover.X + _contentLeft;
 			double hoverY = hover.Y + _contentTop;
 			if (!_dragging && !_dragCandidate) UpdateHoverCursor(IsInsidePet(hoverX, hoverY));
-			if (IsInsidePet(hoverX, hoverY) && !_state.OnTheRun)
-			{
-				// Same trigger as the in-window gaze: quickly wiggling across the
-				// pet's center makes it dizzy (8 direction changes per 600ms).
-				int direction = hoverX < _petLeft + _displaySize / 2 ? -1 : 1;
-				if (_directionChanges.Record(direction, Now()) && _state.Transient != "dizzy")
-				{
-					_state.Wake(Now(), _model, true, _settings.MotionReduced);
-					_state.ShowTransient("dizzy", Now(), _model);
-					_state.ResetIdle(Now(), _model);
-				}
-			}
 			if (!_dragCandidate) return;
 			if (e.LeftButton != MouseButtonState.Pressed) return;
 			Native.POINT cursor;

@@ -61,7 +61,9 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   sync on the desktop (the thinking bubble appears
   while a turn is running). The desktop state machine also mirrors the window: typing while the
   composer has input, waking when facts wake it, **buttonPress** when a request completes (silent
-  when cancelled), dizzy after quick cursor wiggles, reduced-motion variants, and eyes during the
+  when cancelled), dizzy after quick cursor wiggles beside the pet (recorded from the idle facing
+  changes within a 240px radius, first direction not counted, 8 changes/600ms like the window),
+  reduced-motion variants, and eyes during the
   typing/buttonPress/love poses. The periodic blink is implemented as a tiny transparent eye
   overlay (body-colored pupil covers + the 2px clipped pupil lines) shown for 260ms at 1.4–3.4s
   intervals, matching the window's ChatPetBlinkController and disabled under reduced motion. The pupil

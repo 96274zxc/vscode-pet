@@ -849,11 +849,14 @@ namespace BlobbyDesktop
 		public bool Record(int direction, long now)
 		{
 			if (direction == 0 || direction == _direction) return false;
+			bool first = _direction == 0;
 			_direction = direction;
+			if (first) return false;
 			_changes.Add(now);
 			while (_changes.Count > 0 && now - _changes[0] > Interval) _changes.RemoveAt(0);
 			if (_changes.Count < Threshold) return false;
 			_changes.Clear();
+			_direction = 0;
 			return true;
 		}
 	}
@@ -1051,7 +1054,7 @@ namespace BlobbyDesktop
 			checks.Add("reduced-motion-yapping");
 			DesktopDirectionChanges directionChanges = new DesktopDirectionChanges();
 			bool dizzy = false;
-			for (int index = 0; index < 8; index++) dizzy |= directionChanges.Record(index % 2 == 0 ? 1 : -1, now + index * 50);
+			for (int index = 0; index < 9; index++) dizzy |= directionChanges.Record(index % 2 == 0 ? 1 : -1, now + index * 50);
 			Check(failures, "direction changes dizzy", dizzy, dizzy.ToString());
 			checks.Add("direction-dizzy");
 
