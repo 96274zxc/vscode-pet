@@ -2159,6 +2159,18 @@ function getChatPetDesktopFrameKey(prefs) {
 	return `${getChatPetColorVariant(prefs.color)}:${prefs.color}:${prefs.accessory ?? ''}`
 }
 
+function getChatPetDesktopPetScreenRect(controller) {
+	try {
+		const rect = controller?.button?.getBoundingClientRect?.()
+		if (!rect || !(rect.width > 0) || !(rect.height > 0)) return undefined
+		const screenX = typeof window !== 'undefined' && Number.isFinite(window.screenX) ? window.screenX : 0
+		const screenY = typeof window !== 'undefined' && Number.isFinite(window.screenY) ? window.screenY : 0
+		return { left: rect.left + screenX, top: rect.top + screenY, width: rect.width, height: rect.height }
+	} catch (ignored) {
+		return undefined
+	}
+}
+
 class ChatPetDesktopBridge {
 	constructor(options) {
 		this.controller = options.controller
@@ -2185,6 +2197,7 @@ class ChatPetDesktopBridge {
 		this._preparePromise = undefined
 		this._prepareKey = undefined
 		this._preparedSession = undefined
+		this._factsTimer = undefined
 		this._listeners = []
 		this._onVisibilityChange = this._onVisibilityChange.bind(this)
 		this._onWindowFocus = this._onWindowFocus.bind(this)
@@ -2213,6 +2226,7 @@ class ChatPetDesktopBridge {
 		if (this.disposed) return
 		if (this.supported && this.prefs.get().desktopDisplay) {
 			this.prewarm()
+			this._startFactsTimer()
 			if (typeof document !== 'undefined' && (document.hidden || document.hasFocus?.() === false)) this._scheduleStart()
 		}
 	}
@@ -2289,6 +2303,7 @@ class ChatPetDesktopBridge {
 			if (!this.disposed && response?.session) {
 				this._preparedSession = response.session
 				this._prepareKey = key
+				this._startFactsTimer()
 			}
 			return response
 		}, () => undefined).finally(() => {
@@ -2307,18 +2322,45 @@ class ChatPetDesktopBridge {
 	}
 
 	_getFacts() {
-		return {
+		const facts = {
 			running: this.controller?.running === true,
 			pendingInteraction: this.controller?.pending === true,
+			grabbing: this.controller?.dragging === true,
 		}
+		const petRect = getChatPetDesktopPetScreenRect(this.controller)
+		if (petRect) facts.petRect = petRect
+		return facts
 	}
 
 	updateFacts(facts) {
-		if (!this.active || !this.session) return
+		const session = this.active ? this.session : this._preparedSession
+		if (!session) return
+		const current = this._getFacts()
+		const payload = {
+			running: facts?.running === true,
+			pendingInteraction: facts?.pendingInteraction === true,
+		}
+		if (facts?.grabbing === true || current.grabbing) payload.grabbing = true
+		const petRect = facts?.petRect ?? current.petRect
+		if (petRect) payload.petRect = petRect
 		this._request('/facts', {
 			method: 'POST',
-			body: JSON.stringify({ session: this.session, facts: { running: facts?.running === true, pendingInteraction: facts?.pendingInteraction === true } }),
+			body: JSON.stringify({ session, facts: payload }),
 		}).catch(ignored => { /* the next state change retries */ })
+	}
+
+	_startFactsTimer() {
+		if (this._factsTimer || this.disposed) return
+		this._factsTimer = setInterval(() => {
+			if (this.disposed || !this.enabled) return
+			if (!this.active && !this._preparedSession) return
+			this.updateFacts(this._getFacts())
+		}, 250)
+	}
+
+	_stopFactsTimer() {
+		clearInterval(this._factsTimer)
+		this._factsTimer = undefined
 	}
 
 	async _getFrames() {
@@ -2535,10 +2577,12 @@ class ChatPetDesktopBridge {
 			this.prefs.set({ desktopDisplay: true })
 			this.host?.status?.(this._translate('status.desktopEnabled'))
 			this.prewarm()
+			this._startFactsTimer()
 			return
 		}
 		this.prefs.set({ desktopDisplay: false, desktopSmartHide: false })
 		this.host?.status?.(this._translate('status.desktopDisabled'))
+		this._stopFactsTimer()
 		await this.stop({ returning: false, dispose: true })
 		await this._disposePrepared()
 	}
@@ -2574,11 +2618,13 @@ class ChatPetDesktopBridge {
 		if (this.disposed || this._stopping) return
 		const prefs = this.prefs.get()
 		if (!prefs.desktopDisplay || prefs.visible === false) {
+			this._stopFactsTimer()
 			if (this.active) this.stop({ returning: true, dispose: true })
 			else this._disposePrepared()
 			return
 		}
 		if (!this.supported) return
+		this._startFactsTimer()
 		if (!this.active) {
 			this.prewarm()
 			if (typeof document !== 'undefined' && (document.hidden || document.hasFocus?.() === false)) this._scheduleStart()
@@ -2591,6 +2637,7 @@ class ChatPetDesktopBridge {
 		this._startToken += 1
 		this._cancelScheduledStart()
 		this._stopPolling()
+		this._stopFactsTimer()
 		try { document?.removeEventListener?.('visibilitychange', this._onVisibilityChange) } catch (ignored) { /* noop */ }
 		try { window?.removeEventListener?.('focus', this._onWindowFocus) } catch (ignored) { /* noop */ }
 		try { window?.removeEventListener?.('blur', this._onWindowBlur) } catch (ignored) { /* noop */ }

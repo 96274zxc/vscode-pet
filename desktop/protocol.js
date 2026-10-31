@@ -100,10 +100,21 @@ export function mergeDesktopSettings(current, patch) {
 
 export function normalizeDesktopFacts(raw) {
 	const source = isRecord(raw) ? raw : {}
-	return {
+	const facts = {
 		running: readBoolean(source.running, false),
 		pendingInteraction: readBoolean(source.pendingInteraction, false),
 	}
+	if (readBoolean(source.grabbing, false)) facts.grabbing = true
+	if (isRecord(source.petRect)) {
+		const left = Number(source.petRect.left)
+		const top = Number(source.petRect.top)
+		const width = Number(source.petRect.width)
+		const height = Number(source.petRect.height)
+		if ([left, top, width, height].every(Number.isFinite) && width > 0 && height > 0) {
+			facts.petRect = { left, top, width, height }
+		}
+	}
+	return facts
 }
 
 export function normalizeDesktopWindowRect(raw) {

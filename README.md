@@ -47,9 +47,12 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   Run, size controls, Show on Desktop and Smart Hide work on the desktop itself. Throws always land
   on the taskbar/screen floor and never trigger a fall respawn. The helper window ends exactly at the
   taskbar and only the pet/menu accept clicks, so the taskbar and windows underneath stay usable; the
-  menu is positioned before it is shown. The helper renders on the composition loop at the same
-  ~60 fps as the in-window pet, and shows the same grab/grabbing cursor and drag resistance. Chat
-  reactions stay in sync on the desktop (the thinking bubble appears while a turn is running).
+  menu is positioned before it is shown. The helper renders on the composition loop with subpixel
+  position compensation and no per-frame topmost churn, so its motion matches the in-window pet
+  instead of sliding on the window's pixel grid. It also adopts the exact grab cursor used by DSH by
+  capturing the rendered pet's cursor at runtime (no separate cursor asset), together with the same
+  drag-resistance wobble. Chat reactions stay in sync on the desktop (the thinking bubble appears
+  while a turn is running).
   **Smart Hide** keeps the pet on the desktop only instead of above other applications. The native
   helper exits with DSH; on non-Windows the menu items are absent and the host refuses to start the
   helper, and the plain Web GUI hides the items as well.
@@ -170,8 +173,10 @@ the taskbar, throwing without a fall respawn, Smart Hide against a foreground ap
 restore, the desktop Hats command opening the existing panel, and the helper exiting when DSH's
 host closes its stdin. After the handoff optimizations it was re-checked for the prepared helper
 (desktop portal visible within about half a second of clicking away), focus-based switching
-(Alt+Tab/click-away), the ~60 fps composition loop during throws, the custom grab/grabbing cursors,
-the drag resistance wobble, the thinking bubble while a turn runs, a taskbar that stays clickable
-under the pet window, and a desktop context menu that appears at its final position without a flash.
+(Alt+Tab/click-away), the ~60 fps composition loop during throws, subpixel-exact pet placement
+(`appliedScreenX` equal to the physics position instead of the window's rounded pixel), the exact
+DSH grab cursor captured at runtime (byte-identical icon/hotspot), the drag resistance wobble, the
+thinking bubble while a turn runs, a taskbar that stays clickable under the pet window, and a desktop
+context menu that appears at its final position without a flash.
 The helper's geometry, physics and state-machine self-test runs in the test suite.
 

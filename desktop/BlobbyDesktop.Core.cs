@@ -186,15 +186,17 @@ namespace BlobbyDesktop
 	{
 		public bool Running;
 		public bool PendingInteraction;
+		public bool Grabbing;
+		public bool HasPetRect;
+		public double PetLeft;
+		public double PetTop;
+		public double PetWidth;
+		public double PetHeight;
 
 		public static DesktopFacts From(Dictionary<string, object> source)
 		{
 			DesktopFacts facts = new DesktopFacts();
-			if (source != null)
-			{
-				facts.Running = JsonRead.GetBool(source, "running", false);
-				facts.PendingInteraction = JsonRead.GetBool(source, "pendingInteraction", false);
-			}
+			if (source != null) facts.Apply(source);
 			return facts;
 		}
 
@@ -203,6 +205,25 @@ namespace BlobbyDesktop
 			if (source == null) return;
 			if (source.ContainsKey("running")) Running = JsonRead.GetBool(source, "running", Running);
 			if (source.ContainsKey("pendingInteraction")) PendingInteraction = JsonRead.GetBool(source, "pendingInteraction", PendingInteraction);
+			if (source.ContainsKey("grabbing")) Grabbing = JsonRead.GetBool(source, "grabbing", Grabbing);
+			Dictionary<string, object> rect = JsonRead.GetObject(source, "petRect");
+			if (rect != null)
+			{
+				double width = JsonRead.GetNumber(rect, "width", 0);
+				double height = JsonRead.GetNumber(rect, "height", 0);
+				if (width > 0 && height > 0)
+				{
+					PetLeft = JsonRead.GetNumber(rect, "left", PetLeft);
+					PetTop = JsonRead.GetNumber(rect, "top", PetTop);
+					PetWidth = width;
+					PetHeight = height;
+					HasPetRect = true;
+				}
+				else
+				{
+					HasPetRect = false;
+				}
+			}
 		}
 	}
 
