@@ -38,13 +38,18 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   from the top of the chat. On the desktop the taskbar (or the screen bottom while the taskbar is
   auto-hidden) is the floor.
 - **Desktop display (Windows desktop app only)**: the pet's context menu gains a checkable
-  **Show on Desktop** item, with **Smart Hide** directly below it once enabled. When DSH is
-  minimized, Blobby moves to the desktop through the official respawn portal and lands above the
-  taskbar at the bottom-right; when DSH comes back, it plays the portal/fall return inside the
-  window. Double-click the desktop pet to bring the DSH window back. The desktop right-click menu
-  mirrors the DSH menu: Hats, Change Color and Play Jump Game restore DSH and open the existing
-  panels/game, while Go on the Run, size controls, Show on Desktop and Smart Hide work on the
-  desktop itself. Throws always land on the taskbar/screen floor and never trigger a fall respawn.
+  **Show on Desktop** item, with **Smart Hide** directly below it once enabled. While DSH is active
+  the native helper waits prepared, so as soon as DSH is minimized **or loses focus to another
+  window** Blobby moves to the desktop through the official respawn portal and lands above the taskbar
+  at the bottom-right; focusing DSH again plays the portal/fall return inside the window. Double-click
+  the desktop pet to bring the DSH window back. The desktop right-click menu mirrors the DSH menu:
+  Hats, Change Color and Play Jump Game restore DSH and open the existing panels/game, while Go on the
+  Run, size controls, Show on Desktop and Smart Hide work on the desktop itself. Throws always land
+  on the taskbar/screen floor and never trigger a fall respawn. The helper window ends exactly at the
+  taskbar and only the pet/menu accept clicks, so the taskbar and windows underneath stay usable; the
+  menu is positioned before it is shown. The helper renders on the composition loop at the same
+  ~60 fps as the in-window pet, and shows the same grab/grabbing cursor and drag resistance. Chat
+  reactions stay in sync on the desktop (the thinking bubble appears while a turn is running).
   **Smart Hide** keeps the pet on the desktop only instead of above other applications. The native
   helper exits with DSH; on non-Windows the menu items are absent and the host refuses to start the
   helper, and the plain Web GUI hides the items as well.
@@ -121,8 +126,10 @@ app.
 | Bounce while falling / Enter / Space | Bounce |
 | `/blobby` | Unlock Color Customization and open the color tab |
 | `/vscode-pet` | Show/hide Blobby (keeps the plugin installed) |
-| Right-click → **Show on Desktop** | Windows desktop app only: move Blobby to the desktop while DSH is minimized (✓ when enabled) |
+| Right-click → **Show on Desktop** | Windows desktop app only: move Blobby to the desktop while DSH is minimized or unfocused (✓ when enabled) |
 | Right-click → **Smart Hide** | Windows desktop app only: show the desktop pet on the desktop only, never above other apps |
+| Alt+Tab / click another window / minimize | Windows desktop app only: move Blobby to the desktop above the other window |
+| Focus the DSH window | Windows desktop app only: return Blobby into the DSH window |
 | Double-click the desktop pet | Bring the DSH window back |
 
 ## Compatibility
@@ -130,8 +137,9 @@ app.
 - Target: DSH `>=0.2.1-rc.1` Web and Desktop profiles.
 - The desktop display is Windows desktop only. It uses `connection`-authenticated host routes on the
   loopback server plus a local PowerShell/.NET WPF helper; the plain Web GUI hides the menu items and
-  non-Windows hosts return `501` for desktop-start requests. No DSH source is modified and no model
-  tools or routes outside `/api/blobby/desktop/*` are added.
+  non-Windows hosts return `501` for desktop-start requests. While the display is enabled the helper
+  stays prepared in the background for an immediate handoff and exits when DSH exits. No DSH source is
+  modified and no model tools or routes outside `/api/blobby/desktop/*` are added.
 - Preferences, hats, colors and the jump-game high score stay in
   `localStorage['dsh.vscode-pet.prefs.v1']` on the local device. Desktop frames and settings are
   generated on the client; the helper only receives PNG frames, labels and local geometry.
@@ -160,6 +168,10 @@ Desktop display was verified in the same Windows Electron profile: the trailing 
 conditional Smart Hide item, the portal/respawn handoff when minimizing and restoring, landing on
 the taskbar, throwing without a fall respawn, Smart Hide against a foreground app, double-click
 restore, the desktop Hats command opening the existing panel, and the helper exiting when DSH's
-host closes its stdin. The helper's geometry, physics and state-machine self-test runs in the test
-suite.
+host closes its stdin. After the handoff optimizations it was re-checked for the prepared helper
+(desktop portal visible within about half a second of clicking away), focus-based switching
+(Alt+Tab/click-away), the ~60 fps composition loop during throws, the custom grab/grabbing cursors,
+the drag resistance wobble, the thinking bubble while a turn runs, a taskbar that stays clickable
+under the pet window, and a desktop context menu that appears at its final position without a flash.
+The helper's geometry, physics and state-machine self-test runs in the test suite.
 

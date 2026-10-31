@@ -2175,7 +2175,6 @@ class ChatPetDesktopBridge {
 		this._stopping = false
 		this._startToken = 0
 		this._warmupRequested = false
-		this._pendingPatch = {}
 		this._lastSettings = undefined
 		this._startTimer = undefined
 		this._pollAbort = undefined
@@ -2183,14 +2182,23 @@ class ChatPetDesktopBridge {
 		this._frameKey = undefined
 		this._framePromise = undefined
 		this._framePromiseKey = undefined
+		this._preparePromise = undefined
+		this._prepareKey = undefined
+		this._preparedSession = undefined
 		this._listeners = []
 		this._onVisibilityChange = this._onVisibilityChange.bind(this)
+		this._onWindowFocus = this._onWindowFocus.bind(this)
+		this._onWindowBlur = this._onWindowBlur.bind(this)
 		this._onPrefsChange = this._onPrefsChange.bind(this)
 		activeChatPetDesktopBridge = this
 	}
 
 	async init() {
 		if (typeof document !== 'undefined') document.addEventListener('visibilitychange', this._onVisibilityChange)
+		if (typeof window !== 'undefined') {
+			window.addEventListener?.('focus', this._onWindowFocus)
+			window.addEventListener?.('blur', this._onWindowBlur)
+		}
 		this._listeners.push(this.prefs.subscribe(this._onPrefsChange))
 		if (!isChatPetDesktopSupported()) {
 			this._setSupport(false)
@@ -2203,8 +2211,10 @@ class ChatPetDesktopBridge {
 			if (!this.disposed) this._setSupport(false)
 		}
 		if (this.disposed) return
-		if (this.supported && this.prefs.get().desktopDisplay) this.prewarm()
-		if (this.supported && typeof document !== 'undefined' && document.hidden && this.prefs.get().desktopDisplay) this._scheduleStart()
+		if (this.supported && this.prefs.get().desktopDisplay) {
+			this.prewarm()
+			if (typeof document !== 'undefined' && (document.hidden || document.hasFocus?.() === false)) this._scheduleStart()
+		}
 	}
 
 	get enabled() {
@@ -2220,6 +2230,7 @@ class ChatPetDesktopBridge {
 			supported: this.supported,
 			active: this.active,
 			session: this.session,
+			prepared: Boolean(this._preparedSession),
 			version: this.version,
 			framesCached: Boolean(this._frames),
 			settings: this._lastSettings,
@@ -2256,11 +2267,43 @@ class ChatPetDesktopBridge {
 
 	async prewarm() {
 		if (this.disposed || !this.supported) return
-		this._getFrames().catch(ignored => { /* retried on the next change or start */ })
+		const frames = this._getFrames()
+		frames.catch(ignored => { /* retried on the next change or start */ })
 		if (!this._warmupRequested) {
 			this._warmupRequested = true
 			this._request('/warmup', { method: 'POST' }).catch(() => { this._warmupRequested = false })
 		}
+		frames.then(value => {
+			if (this.disposed || this.active || !this.enabled) return
+			this._prepareFrames(value)
+		}).catch(ignored => { /* start reports the error */ })
+	}
+
+	_prepareFrames(frames) {
+		if (this.disposed || this.active || !this.enabled) return Promise.resolve(undefined)
+		const key = getChatPetDesktopFrameKey(this.prefs.get())
+		if (this._preparedSession && this._prepareKey === key) return Promise.resolve(this._preparedSession)
+		if (this._preparePromise && this._prepareKey === key) return this._preparePromise
+		const bundle = this._buildBundle(frames)
+		const promise = this._request('/prepare', { method: 'POST', body: JSON.stringify({ bundle }) }).then(response => {
+			if (!this.disposed && response?.session) {
+				this._preparedSession = response.session
+				this._prepareKey = key
+			}
+			return response
+		}, () => undefined).finally(() => {
+			if (this._preparePromise === promise) this._preparePromise = undefined
+		})
+		this._preparePromise = promise
+		this._prepareKey = key
+		return promise
+	}
+
+	async _disposePrepared() {
+		this._prepareKey = undefined
+		this._preparedSession = undefined
+		if (!this.supported || this.disposed) return
+		try { await this._request('/dispose', { method: 'POST' }) } catch (ignored) { /* best effort */ }
 	}
 
 	_getFacts() {
@@ -2309,6 +2352,7 @@ class ChatPetDesktopBridge {
 		const prefs = this.prefs.get()
 		return {
 			protocol: CHAT_PET_DESKTOP_PROTOCOL,
+			frameKey: getChatPetDesktopFrameKey(prefs),
 			settings: {
 				scale: prefs.scale,
 				smartHide: prefs.desktopSmartHide === true,
@@ -2350,30 +2394,32 @@ class ChatPetDesktopBridge {
 		this._startTimer = undefined
 	}
 
-	async start() {
+	async start(options = {}) {
 		if (this.disposed || this.active || this._starting) return
 		if (!this.supported || !this.enabled || this.prefs.get().visible === false) return
-		if (typeof document !== 'undefined' && !document.hidden) return
+		if (options.force !== true && typeof document !== 'undefined' && !document.hidden && document.hasFocus?.() === true) return
 		this._starting = true
 		const token = ++this._startToken
 		this.controller?.suspendForDesktop?.()
 		try {
 			const frames = await this._getFrames()
-			if (this.disposed || token !== this._startToken || !this.enabled || (typeof document !== 'undefined' && !document.hidden)) {
+			if (this.disposed || token !== this._startToken || !this.enabled) {
 				this.controller?.cancelDesktopSuspend?.()
 				return
 			}
 			const bundle = this._buildBundle(frames)
 			const response = await this._request('/start', { method: 'POST', body: JSON.stringify({ bundle }) })
 			if (this.disposed || token !== this._startToken) {
-				if (response?.session) this._request('/stop', { method: 'POST', body: JSON.stringify({ session: response.session }) }).catch(() => {})
+				if (response?.session) this._request('/stop', { method: 'POST', body: JSON.stringify({ session: response.session, dispose: true }) }).catch(() => {})
 				return
 			}
 			this.active = true
 			this.session = response?.session
+			this._preparedSession = response?.session
 			this.version = Number.isFinite(response?.version) ? response.version : 0
 			this._lastSettings = response?.settings
 			this._startPolling()
+			this.updateFacts({ running: this.controller?.running === true, pendingInteraction: this.controller?.pending === true })
 		} catch (error) {
 			this.controller?.cancelDesktopSuspend?.()
 			this.host?.status?.(this._translate('status.desktopError'))
@@ -2396,6 +2442,10 @@ class ChatPetDesktopBridge {
 					if (abort?.signal.aborted || this.session !== session) return
 					if (result && Number.isFinite(result.version)) this.version = result.version
 					if (result?.settings) this._applyDesktopSettings(result.settings)
+					if (result?.prepared === true && this.active) {
+						this.stop({ returning: true })
+						return
+					}
 				} catch (error) {
 					if (abort?.signal.aborted || this.disposed || this.session !== session) return
 					if (error?.status === 410 || error?.status === 404) return
@@ -2434,6 +2484,7 @@ class ChatPetDesktopBridge {
 
 	async stop(options = {}) {
 		const returning = options.returning !== false
+		const dispose = options.dispose === true
 		this._startToken += 1
 		const session = this.session
 		const wasActive = this.active
@@ -2444,12 +2495,16 @@ class ChatPetDesktopBridge {
 		let response
 		if (session && !this.disposed) {
 			try {
-				response = await this._request('/stop', { method: 'POST', body: JSON.stringify({ session }) })
+				response = await this._request('/stop', { method: 'POST', body: JSON.stringify({ session, dispose }) })
 			} catch (error) {
 				console.warn('[vscode-pet] desktop stop failed', error)
 			}
 		}
 		if (response?.settings) this._applyDesktopSettings(response.settings)
+		if (dispose) {
+			this._preparedSession = undefined
+			this._prepareKey = undefined
+		}
 		this._notifyPrefs()
 		this._stopping = false
 		if (!wasActive) {
@@ -2484,7 +2539,8 @@ class ChatPetDesktopBridge {
 		}
 		this.prefs.set({ desktopDisplay: false, desktopSmartHide: false })
 		this.host?.status?.(this._translate('status.desktopDisabled'))
-		await this.stop({ returning: false })
+		await this.stop({ returning: false, dispose: true })
+		await this._disposePrepared()
 	}
 
 	toggleSmartHide() {
@@ -2503,14 +2559,30 @@ class ChatPetDesktopBridge {
 		}
 	}
 
+	_onWindowFocus() {
+		if (this.disposed) return
+		this._cancelScheduledStart()
+		if (this.active) this.stop({ returning: true })
+	}
+
+	_onWindowBlur() {
+		if (this.disposed || !this.enabled) return
+		this._scheduleStart()
+	}
+
 	_onPrefsChange() {
 		if (this.disposed || this._stopping) return
 		const prefs = this.prefs.get()
 		if (!prefs.desktopDisplay || prefs.visible === false) {
-			if (this.active) this.stop({ returning: true })
+			if (this.active) this.stop({ returning: true, dispose: true })
+			else this._disposePrepared()
 			return
 		}
-		if (this.supported && !this.active) this.prewarm()
+		if (!this.supported) return
+		if (!this.active) {
+			this.prewarm()
+			if (typeof document !== 'undefined' && (document.hidden || document.hasFocus?.() === false)) this._scheduleStart()
+		}
 	}
 
 	dispose() {
@@ -2520,6 +2592,8 @@ class ChatPetDesktopBridge {
 		this._cancelScheduledStart()
 		this._stopPolling()
 		try { document?.removeEventListener?.('visibilitychange', this._onVisibilityChange) } catch (ignored) { /* noop */ }
+		try { window?.removeEventListener?.('focus', this._onWindowFocus) } catch (ignored) { /* noop */ }
+		try { window?.removeEventListener?.('blur', this._onWindowBlur) } catch (ignored) { /* noop */ }
 		for (const unsubscribe of this._listeners) {
 			try { unsubscribe?.() } catch (ignored) { /* isolation */ }
 		}
@@ -2527,7 +2601,8 @@ class ChatPetDesktopBridge {
 		const session = this.session
 		this.session = undefined
 		this.active = false
-		if (session) this._request('/stop', { method: 'POST', body: JSON.stringify({ session }) }).catch(() => {})
+		if (session) this._request('/stop', { method: 'POST', body: JSON.stringify({ session, dispose: true }) }).catch(() => {})
+		this._request('/dispose', { method: 'POST' }).catch(() => {})
 		this.controller?.cancelDesktopSuspend?.()
 		if (activeChatPetDesktopBridge === this) activeChatPetDesktopBridge = undefined
 	}
@@ -3411,6 +3486,11 @@ class ChatPetController {
 		const rect = this.button.getBoundingClientRect()
 		this._facing.snapToCursor(this._cursor.x, rect.left + rect.width / 2)
 		this.button.dataset.facing = this._facing.direction
+	}
+
+	_onPointerUp(event) {
+		if (!this._drag || this._drag.pointerId !== event.pointerId) return
+		this._onDragEnd(event)
 	}
 
 	_onPointerDown(event) {

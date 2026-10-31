@@ -877,6 +877,11 @@ class ChatPetController {
 		this.button.dataset.facing = this._facing.direction
 	}
 
+	_onPointerUp(event) {
+		if (!this._drag || this._drag.pointerId !== event.pointerId) return
+		this._onDragEnd(event)
+	}
+
 	_onPointerDown(event) {
 		if (event.button !== 0 || this._jumpGame || this.dead || this.dragging || this.airborne || this.onTheRun) return
 		event.preventDefault()

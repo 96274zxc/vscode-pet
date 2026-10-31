@@ -221,6 +221,7 @@ export function validateDesktopBundle(raw) {
 	const theme = normalizeDesktopTheme(raw.theme)
 	const model = normalizeDesktopModel(raw.model)
 	const windowRect = normalizeDesktopWindowRect(raw.windowRect)
+	const frameKey = typeof raw.frameKey === 'string' ? raw.frameKey.slice(0, 200) : ''
 	if (!isRecord(raw.states)) throw httpError(400, 'desktop states are missing')
 	const states = {}
 	let totalBytes = 0
@@ -235,7 +236,7 @@ export function validateDesktopBundle(raw) {
 	const bubble = normalizeEffect(raw.bubble, 'bubble')
 	const respawn = normalizeEffect(raw.respawn, 'respawn')
 	if (totalBytes > DESKTOP_MAX_BUNDLE_BYTES) throw httpError(400, 'desktop bundle is too large')
-	return { protocol: DESKTOP_PROTOCOL, settings, facts, labels, theme, model, windowRect, states, bubble, respawn }
+	return { protocol: DESKTOP_PROTOCOL, frameKey, settings, facts, labels, theme, model, windowRect, states, bubble, respawn }
 }
 
 function normalizeEffect(raw, label) {

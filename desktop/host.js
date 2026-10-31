@@ -94,10 +94,13 @@ export class DesktopHelperManager {
 		}
 	}
 
-	_helperArgs(extra, manifestPath) {
+	_helperArgs(extra, manifestPath, prepared) {
 		const args = ['-NoProfile', '-STA', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', this.helperScript]
 		if (extra) args.push(...extra)
-		else args.push(manifestPath, String(this.parentPid))
+		else {
+			if (prepared) args.push('-Prepared')
+			args.push(manifestPath, String(this.parentPid))
+		}
 		return args
 	}
 
@@ -120,19 +123,65 @@ export class DesktopHelperManager {
 		return this.warmupPromise
 	}
 
+	async prepare(rawBundle) {
+		this._assertSupported()
+		const bundle = validateDesktopBundle(rawBundle)
+		if (this._preparing) return this._preparing
+		this._preparing = this._prepareInternal(bundle).finally(() => { this._preparing = undefined })
+		return this._preparing
+	}
+
+	async _prepareInternal(bundle) {
+		const existing = this.session
+		if (existing && !existing.exited && existing.prepared && existing.frameKey === bundle.frameKey) {
+			existing.settings = { ...bundle.settings, desktopDisplay: true }
+			existing.facts = bundle.facts
+			return { session: existing.id, prepared: true, version: existing.version }
+		}
+		await this._disposeCurrent()
+		const session = await this._spawn(bundle, true)
+		session.prepared = true
+		session.visible = false
+		session.frameKey = bundle.frameKey
+		return { session: session.id, prepared: true, version: session.version }
+	}
+
 	async start(rawBundle) {
 		this._assertSupported()
 		const bundle = validateDesktopBundle(rawBundle)
 		if (this.warmupPromise) {
 			try { await this.warmupPromise } catch (ignored) { /* the real start reports its own failure */ }
 		}
-		await this._stopCurrent()
+		if (this._preparing) {
+			try { await this._preparing } catch (ignored) { /* fall back to a cold helper */ }
+		}
+		const current = this.session
+		if (current && !current.exited && current.prepared && !current.visible && current.frameKey === bundle.frameKey) {
+			current.settings = { ...bundle.settings, desktopDisplay: true }
+			current.facts = bundle.facts
+			current.prepared = false
+			current.visible = true
+			current.version += 1
+			current.lastPollAt = Date.now()
+			this._writeStdin(current, { type: 'show', settings: current.settings, facts: current.facts })
+			this._wakeWaiters(current)
+			return { session: current.id, version: current.version, settings: current.settings, protocol: DESKTOP_PROTOCOL }
+		}
+		await this._disposeCurrent()
+		const session = await this._spawn(bundle, false)
+		session.prepared = false
+		session.visible = true
+		session.frameKey = bundle.frameKey
+		return { session: session.id, version: session.version, settings: session.settings, protocol: DESKTOP_PROTOCOL }
+	}
+
+	async _spawn(bundle, prepared) {
 		const sessionId = randomBytes(16).toString('hex')
 		const dir = join(this.tempRoot, sessionId)
 		const manifest = await this._writeBundle(dir, bundle, sessionId)
 		let child
 		try {
-			child = this.spawn(this.powershell, this._helperArgs(undefined, manifest.path), {
+			child = this.spawn(this.powershell, this._helperArgs(undefined, manifest.path, prepared), {
 				stdio: ['pipe', 'pipe', 'pipe'],
 				windowsHide: true,
 				cwd: dir,
@@ -147,6 +196,9 @@ export class DesktopHelperManager {
 			manifestPath: manifest.path,
 			settings: { ...bundle.settings, desktopDisplay: true },
 			facts: bundle.facts,
+			frameKey: bundle.frameKey,
+			prepared: prepared === true,
+			visible: prepared !== true,
 			version: 0,
 			command: undefined,
 			lastPollAt: Date.now(),
@@ -158,6 +210,8 @@ export class DesktopHelperManager {
 			exited: false,
 			exiting: false,
 			stopping: undefined,
+			hiddenPromise: undefined,
+			resolveHidden: undefined,
 			exitPromise: undefined,
 			resolveExit: undefined,
 			readyTimer: undefined,
@@ -182,7 +236,7 @@ export class DesktopHelperManager {
 			await this._cleanupSession(session)
 			throw error
 		}
-		return { session: sessionId, version: session.version, settings: session.settings, protocol: DESKTOP_PROTOCOL }
+		return session
 	}
 
 	_attach(session) {
@@ -231,6 +285,23 @@ export class DesktopHelperManager {
 			session.settings = mergeDesktopSettings(session.settings, message.settings)
 			session.version += 1
 			this._wakeWaiters(session)
+			return
+		}
+		if (message.type === 'shown') {
+			session.prepared = false
+			session.visible = true
+			return
+		}
+		if (message.type === 'hidden') {
+			session.settings = mergeDesktopSettings(session.settings, message.settings)
+			session.prepared = true
+			session.visible = false
+			session.version += 1
+			this._wakeWaiters(session)
+			const resolveHidden = session.resolveHidden
+			session.resolveHidden = undefined
+			session.hiddenPromise = undefined
+			try { resolveHidden?.() } catch (ignored) { /* isolation */ }
 			return
 		}
 		if (message.type === 'command') {
@@ -297,6 +368,7 @@ export class DesktopHelperManager {
 		return {
 			version: session.version,
 			settings: { ...session.settings, desktopDisplay: session.settings.desktopDisplay !== false },
+			prepared: session.prepared === true,
 		}
 	}
 
@@ -371,7 +443,7 @@ export class DesktopHelperManager {
 		return false
 	}
 
-	async stop(sessionId) {
+	async stop(sessionId, options = {}) {
 		if (!sessionId) throw httpError(400, 'desktop session is required')
 		if (!isDesktopSessionId(sessionId)) throw httpError(400, 'desktop session is invalid')
 		const session = this.session
@@ -380,37 +452,66 @@ export class DesktopHelperManager {
 				? this.lastStop
 				: { sessionId, settings: undefined, command: undefined }
 		}
-		if (session.stopping) return session.stopping
-		session.stopping = (async () => {
-			session.exiting = true
+		const dispose = options.dispose === true
+		if (session.prepared && !session.visible) {
 			const result = {
 				sessionId,
 				settings: { ...session.settings, desktopDisplay: session.settings.desktopDisplay !== false },
 				command: session.command,
 			}
-			this._writeStdin(session, { type: 'stop', despawn: true })
-			const exitTimeout = new Promise(resolve => {
+			if (dispose) {
+				this._kill(session)
+				await this._cleanupSession(session)
+			}
+			this.lastStop = result
+			return result
+		}
+		if (session.stopping) return session.stopping
+		session.stopping = (async () => {
+			const result = {
+				sessionId,
+				settings: { ...session.settings, desktopDisplay: session.settings.desktopDisplay !== false },
+				command: session.command,
+			}
+			let resolveHidden
+			const hidden = new Promise(resolve => { resolveHidden = resolve })
+			session.resolveHidden = resolveHidden
+			this._writeStdin(session, { type: 'stop', dispose })
+			const timeout = new Promise(resolve => {
 				const timer = setTimeout(resolve, STOP_TIMEOUT)
 				timer.unref?.()
 			})
-			await Promise.race([session.exitPromise, exitTimeout])
-			if (!session.exited) this._kill(session)
-			await this._cleanupSession(session)
+			await Promise.race([hidden, session.exitPromise, timeout])
+			if (session.exited) {
+				await this._cleanupSession(session)
+			} else if (dispose) {
+				this._kill(session)
+				await this._cleanupSession(session)
+			} else {
+				session.prepared = true
+				session.visible = false
+			}
+			session.stopping = undefined
 			this.lastStop = result
 			return result
 		})()
 		return session.stopping
 	}
 
-	async _stopCurrent() {
+	async _disposeCurrent() {
 		const session = this.session
 		if (!session) return
 		try {
-			await this.stop(session.id)
+			await this.stop(session.id, { dispose: true })
 		} catch (ignored) {
 			this._kill(session)
 			await this._cleanupSession(session)
 		}
+	}
+
+	async disposeSession() {
+		if (this.session) await this._disposeCurrent()
+		return { ok: true }
 	}
 
 	_kill(session) {
@@ -492,7 +593,7 @@ export class DesktopHelperManager {
 	sweep() {
 		if (this.disposed) return
 		const session = this.session
-		if (!session) return
+		if (!session || session.prepared) return
 		if (Date.now() - session.lastPollAt > HEARTBEAT_TIMEOUT) {
 			this.logger.warn?.('[vscode-pet:desktop] stopping an idle desktop helper')
 			this._kill(session)
@@ -561,6 +662,16 @@ export function createDesktopRoutes(manager) {
 			fetch: wrap(async () => jsonResponse(await manager.warmup())),
 		},
 		{
+			path: `${DESKTOP_ROUTE}/prepare`,
+			methods: ['POST'],
+			requestBody: 'buffered',
+			fetch: wrap(async request => {
+				const body = await readJsonBody(request)
+				if (!body || typeof body !== 'object' || body.bundle === undefined) throw httpError(400, 'desktop bundle is required')
+				return jsonResponse(await manager.prepare(body.bundle))
+			}),
+		},
+		{
 			path: `${DESKTOP_ROUTE}/start`,
 			methods: ['POST'],
 			requestBody: 'buffered',
@@ -569,6 +680,12 @@ export function createDesktopRoutes(manager) {
 				if (!body || typeof body !== 'object' || body.bundle === undefined) throw httpError(400, 'desktop bundle is required')
 				return jsonResponse(await manager.start(body.bundle))
 			}),
+		},
+		{
+			path: `${DESKTOP_ROUTE}/dispose`,
+			methods: ['POST'],
+			requestBody: 'buffered',
+			fetch: wrap(async () => jsonResponse(await manager.disposeSession())),
 		},
 		{
 			path: `${DESKTOP_ROUTE}/pending`,
@@ -599,7 +716,7 @@ export function createDesktopRoutes(manager) {
 			fetch: wrap(async request => {
 				const body = await readJsonBody(request)
 				if (!body || typeof body !== 'object' || !body.session) throw httpError(400, 'desktop session is required')
-				return jsonResponse(await manager.stop(String(body.session)))
+				return jsonResponse(await manager.stop(String(body.session), { dispose: body.dispose === true }))
 			}),
 		},
 	]

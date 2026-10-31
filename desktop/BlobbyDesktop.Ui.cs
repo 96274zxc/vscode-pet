@@ -285,7 +285,7 @@ namespace BlobbyDesktop
 		}
 
 		[STAThread]
-		public static int Run(string manifestPath, string parentPid)
+		public static int Run(string manifestPath, string parentPid, string prepared)
 		{
 			Native.EnableDpiAwareness();
 			DesktopManifest manifest;
@@ -300,11 +300,12 @@ namespace BlobbyDesktop
 			}
 			int pid = 0;
 			if (!string.IsNullOrEmpty(parentPid)) int.TryParse(parentPid, out pid);
+			bool isPrepared = prepared == "1" || string.Equals(prepared, "true", StringComparison.OrdinalIgnoreCase);
 			try
 			{
 				Application application = new Application();
 				application.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-				BlobbyWindow window = new BlobbyWindow(manifest, pid);
+				BlobbyWindow window = new BlobbyWindow(manifest, pid, isPrepared);
 				Thread reader = new Thread(delegate()
 				{
 					try
@@ -382,6 +383,7 @@ namespace BlobbyDesktop
 			Airborne,
 			Stopping,
 			Stopped,
+			Prepared,
 		}
 
 		private readonly DesktopManifest _manifest;
@@ -461,31 +463,77 @@ namespace BlobbyDesktop
 		private double _contentTop;
 		private double _contentWidth;
 		private double _contentHeight;
-		private bool _windowShown;
 		private bool _stopped;
 		private string _stopReason = "";
+		private bool _prepared;
+		private bool _disposeOnStop;
+		private double _padX = 80;
+		private double _padTop = 64;
+		private double _lastWindowX = double.NaN;
+		private double _lastWindowY = double.NaN;
+		private double _lastWindowWidth = double.NaN;
+		private double _lastWindowHeight = double.NaN;
+		private long _lastBubbleFrame = -1;
+		private bool _bubbleOnLeft;
+		private string _transformKey;
+		private bool _lastClip;
+		private bool _renderingActive;
+		private long _lastRenderTick;
+		private Cursor _grabCursor;
+		private Cursor _grabbingCursor;
 
-		public BlobbyWindow(DesktopManifest manifest, int parentPid)
+		public BlobbyWindow(DesktopManifest manifest, int parentPid, bool prepared)
 		{
 			_manifest = manifest;
 			_model = manifest.Model;
 			_settings = manifest.Settings;
 			_facts = manifest.Facts;
 			_parentPid = parentPid > 0 ? parentPid : manifest.ParentPid;
+			_prepared = prepared;
 			_displaySize = _model.Sizes.Display * _settings.Scale;
 			ResolveWindowTarget();
 			BuildWindow();
-			BeginStart();
 			_startedAt = Now();
 			_lastTick = _startedAt;
 			_state.SetFacts(_facts, _model, _startedAt);
 			_state.OnTheRun = _settings.OnTheRun;
 			_state.ResetIdle(_startedAt, _model);
-			_timer = new DispatcherTimer(DispatcherPriority.Render);
-			_timer.Interval = TimeSpan.FromMilliseconds(16);
+			if (!_prepared) BeginStart();
+			_timer = new DispatcherTimer(DispatcherPriority.Normal);
+			_timer.Interval = TimeSpan.FromMilliseconds(500);
 			_timer.Tick += delegate { Tick(); };
-			_timer.Start();
+			if (_prepared)
+			{
+				_timer.Start();
+			}
+			else
+			{
+				StartRendering();
+			}
 			Program.Emit(ReadyMessage());
+		}
+
+		private void StartRendering()
+		{
+			if (_renderingActive) return;
+			_renderingActive = true;
+			CompositionTarget.Rendering += OnRendering;
+		}
+
+		private void StopRendering()
+		{
+			if (!_renderingActive) return;
+			_renderingActive = false;
+			CompositionTarget.Rendering -= OnRendering;
+		}
+
+		private void OnRendering(object sender, EventArgs e)
+		{
+			if (_stopped) return;
+			long now = Now();
+			if (now - _lastRenderTick < 10) return;
+			_lastRenderTick = now;
+			Tick();
 		}
 
 		private static Dictionary<string, object> ReadyMessage()
@@ -619,17 +667,22 @@ namespace BlobbyDesktop
 			_window.MouseLeftButtonUp += OnMouseLeftUp;
 			_window.MouseMove += OnMouseMove;
 			_window.MouseRightButtonUp += OnMouseRightUp;
+			_window.MouseLeave += delegate { if (!_dragging) _window.Cursor = Cursors.Arrow; };
 			_window.Closed += delegate { ShutdownResources(); };
-			LayoutWindow(true);
-			_window.Show();
-			_hwnd = new WindowInteropHelper(_window).Handle;
+			ComputePads();
+			LoadCursors();
+			_hwnd = new WindowInteropHelper(_window).EnsureHandle();
 			Native.StyleOverlayWindow(_hwnd);
 			_source = HwndSource.FromHwnd(_hwnd);
 			if (_source != null) _source.AddHook(WndProc);
 			LayoutWindow(true);
-			_window.Opacity = 1;
-			_windowShown = true;
-			ApplyTopmost();
+			if (!_prepared)
+			{
+				_window.Opacity = 1;
+				_window.Show();
+				LayoutWindow(true);
+				ApplyTopmost();
+			}
 		}
 
 		private void BeginStart()
@@ -664,7 +717,7 @@ namespace BlobbyDesktop
 
 		private bool ShouldBeTopmost()
 		{
-			return !_settings.SmartHide && _phase != Phase.Stopping;
+			return !_settings.SmartHide && _phase != Phase.Stopping && _phase != Phase.Prepared;
 		}
 
 		private void ApplyTopmost()
@@ -674,34 +727,141 @@ namespace BlobbyDesktop
 			Native.PlaceWindow(_hwnd, ShouldBeTopmost(), (int)Math.Round((_monitorPhysical.Left + _contentLeft * _dpiScale)), (int)Math.Round((_monitorPhysical.Top + _contentTop * _dpiScale)), (int)Math.Round(_contentWidth * _dpiScale), (int)Math.Round(_contentHeight * _dpiScale));
 		}
 
+		private void LoadCursors()
+		{
+			try
+			{
+				string dir = Path.Combine(Path.GetTempPath(), "dsh-blobby-desktop-cursors");
+				Directory.CreateDirectory(dir);
+				_grabCursor = LoadCursorFile(dir, "grab", false);
+				_grabbingCursor = LoadCursorFile(dir, "grabbing", true);
+			}
+			catch (Exception)
+			{
+				_grabCursor = null;
+				_grabbingCursor = null;
+			}
+		}
+
+		private static Cursor LoadCursorFile(string dir, string name, bool closed)
+		{
+			try
+			{
+				string path = Path.Combine(dir, name + "-" + Process.GetCurrentProcess().Id + ".cur");
+				if (!File.Exists(path)) WriteCursorFile(path, closed);
+				return new Cursor(path);
+			}
+			catch (Exception)
+			{
+				return null;
+			}
+		}
+
+		private static void WriteCursorFile(string path, bool closed)
+		{
+			const int size = 32;
+			DrawingVisual visual = new DrawingVisual();
+			using (DrawingContext context = visual.RenderOpen())
+			{
+				Brush fill = new SolidColorBrush(Color.FromRgb(250, 250, 250));
+				Pen outline = new Pen(new SolidColorBrush(Color.FromRgb(28, 28, 28)), 1.4);
+				outline.LineJoin = PenLineJoin.Round;
+				if (!closed)
+				{
+					context.DrawRoundedRectangle(fill, outline, new Rect(9, 12, 15, 13), 5, 5);
+					context.DrawRoundedRectangle(fill, outline, new Rect(10, 4, 4, 12), 2, 2);
+					context.DrawRoundedRectangle(fill, outline, new Rect(15, 2, 4, 13), 2, 2);
+					context.DrawRoundedRectangle(fill, outline, new Rect(20, 5, 4, 11), 2, 2);
+					context.DrawRoundedRectangle(fill, outline, new Rect(24, 9, 4, 8), 2, 2);
+					context.DrawRoundedRectangle(fill, outline, new Rect(4, 15, 7, 7), 3, 3);
+				}
+				else
+				{
+					context.DrawRoundedRectangle(fill, outline, new Rect(8, 12, 17, 13), 5, 5);
+					context.DrawRoundedRectangle(fill, outline, new Rect(10, 8, 5, 7), 2, 2);
+					context.DrawRoundedRectangle(fill, outline, new Rect(15, 6, 5, 9), 2, 2);
+					context.DrawRoundedRectangle(fill, outline, new Rect(20, 8, 5, 7), 2, 2);
+					context.DrawRoundedRectangle(fill, outline, new Rect(5, 14, 7, 7), 3, 3);
+				}
+			}
+			RenderTargetBitmap bitmap = new RenderTargetBitmap(size, size, 96, 96, PixelFormats.Pbgra32);
+			bitmap.Render(visual);
+			byte[] pixels = new byte[size * size * 4];
+			bitmap.CopyPixels(pixels, size * 4, 0);
+			int xorSize = size * size * 4;
+			int maskStride = ((size + 31) / 32) * 4;
+			int maskSize = maskStride * size;
+			using (FileStream stream = File.Create(path))
+			using (BinaryWriter writer = new BinaryWriter(stream))
+			{
+				writer.Write((short)0);
+				writer.Write((short)2);
+				writer.Write((short)1);
+				writer.Write((byte)size);
+				writer.Write((byte)size);
+				writer.Write((byte)0);
+				writer.Write((byte)0);
+				writer.Write((short)16);
+				writer.Write((short)18);
+				writer.Write(40 + xorSize + maskSize);
+				writer.Write(6 + 16);
+				writer.Write(40);
+				writer.Write(size);
+				writer.Write(size * 2);
+				writer.Write((short)1);
+				writer.Write((short)32);
+				writer.Write(0);
+				writer.Write(xorSize + maskSize);
+				writer.Write(0);
+				writer.Write(0);
+				writer.Write(0);
+				writer.Write(0);
+				for (int y = size - 1; y >= 0; y--) writer.Write(pixels, y * size * 4, size * 4);
+				for (int y = size - 1; y >= 0; y--)
+				{
+					byte[] mask = new byte[maskStride];
+					for (int x = 0; x < size; x++)
+					{
+						int alpha = pixels[(y * size + x) * 4 + 3];
+						if (alpha < 8) mask[x / 8] |= (byte)(1 << (7 - (x % 8)));
+					}
+					writer.Write(mask);
+				}
+			}
+		}
+
+		private void UpdateHoverCursor(bool overPet)
+		{
+			if (_dragging)
+			{
+				_window.Cursor = _grabbingCursor ?? Cursors.Hand;
+				return;
+			}
+			_window.Cursor = overPet ? (_grabCursor ?? Cursors.Hand) : Cursors.Arrow;
+		}
+
+		private void ComputePads()
+		{
+			DesktopAnimation animation = _currentAnimation ?? AnimationFor("idle");
+			double frameWidth = animation == null ? _displaySize : animation.Width / 2.0 * _settings.Scale;
+			double frameHeight = animation == null ? _displaySize : animation.Height / 2.0 * _settings.Scale;
+			double wideOverhang = Math.Max(0, frameWidth - _displaySize);
+			double tallOver = Math.Max(0, frameHeight - _displaySize);
+			double scale = Math.Max(0.0001, _settings.Scale);
+			_padX = wideOverhang + _displaySize * 0.5 + 8;
+			_padTop = Math.Max(32 * scale, tallOver) + _displaySize * 0.5 + 8;
+		}
+
 		private void LayoutWindow(bool force)
 		{
 			if (_window == null || _geometry == null) return;
-			if (!_windowShown)
-			{
-				_window.Width = 1;
-				_window.Height = 1;
-			}
-			double wideOverhang = 0;
-			double tallOver = 0;
-			foreach (KeyValuePair<string, DesktopAnimation> pair in _manifest.States)
-			{
-				DesktopAnimation animation = pair.Value;
-				double frameWidth = animation.Width / 2.0 * _settings.Scale;
-				double frameHeight = animation.Height / 2.0 * _settings.Scale;
-				double overhang = Math.Max(0, frameWidth - _displaySize);
-				if (overhang > wideOverhang) wideOverhang = overhang;
-				double tall = Math.Max(0, frameHeight - _displaySize);
-				if (tall > tallOver) tallOver = tall;
-			}
-			double scale = Math.Max(0.0001, _settings.Scale);
-			double padX = wideOverhang + _displaySize * 0.5 + 8;
-			double padTop = Math.Max(32 * scale, tallOver) + _displaySize * 0.5 + 8;
-			double padBottom = _displaySize * 0.5 + 8;
+			double padX = _padX;
+			double padTop = _padTop;
 			double baseLeft = _petLeft - padX;
 			double baseTop = _petTop - padTop;
 			double baseRight = _petLeft + _displaySize + padX;
-			double baseBottom = _petTop + _displaySize + padBottom;
+			// The window ends exactly at the pet's feet so it never covers the taskbar.
+			double baseBottom = _petTop + _displaySize;
 			double left = baseLeft;
 			double top = baseTop;
 			double right = baseRight;
@@ -717,24 +877,29 @@ namespace BlobbyDesktop
 			double newTop = Math.Round(top);
 			double newWidth = Math.Max(1, Math.Round(right - left));
 			double newHeight = Math.Max(1, Math.Round(bottom - top));
-			bool changed = force || newLeft != _contentLeft || newTop != _contentTop || newWidth != _contentWidth || newHeight != _contentHeight;
+			bool originChanged = newLeft != _contentLeft || newTop != _contentTop;
+			bool sizeChanged = newWidth != _contentWidth || newHeight != _contentHeight;
+			if (!originChanged && !sizeChanged && !force) return;
 			_contentLeft = newLeft;
 			_contentTop = newTop;
 			_contentWidth = newWidth;
 			_contentHeight = newHeight;
-			if (!_windowShown)
+			if (_window.Width != _contentWidth || _window.Height != _contentHeight)
 			{
 				_window.Width = _contentWidth;
 				_window.Height = _contentHeight;
-				return;
 			}
-			_window.Width = _contentWidth;
-			_window.Height = _contentHeight;
-			if (changed || force) PositionPetAndLayers();
+			if (sizeChanged || force) PositionPetAndLayers();
+			if (!originChanged && !sizeChanged && !force) return;
 			int x = (int)Math.Round(_monitorPhysical.Left + _contentLeft * _dpiScale);
 			int y = (int)Math.Round(_monitorPhysical.Top + _contentTop * _dpiScale);
 			int width = (int)Math.Round(_contentWidth * _dpiScale);
 			int height = (int)Math.Round(_contentHeight * _dpiScale);
+			if (!force && x == _lastWindowX && y == _lastWindowY && width == _lastWindowWidth && height == _lastWindowHeight) return;
+			_lastWindowX = x;
+			_lastWindowY = y;
+			_lastWindowWidth = width;
+			_lastWindowHeight = height;
 			if (_hwnd != IntPtr.Zero) Native.PlaceWindow(_hwnd, ShouldBeTopmost(), x, y, width, height);
 		}
 
@@ -777,6 +942,7 @@ namespace BlobbyDesktop
 			{
 				_currentState = state;
 				_currentAnimation = AnimationFor(state);
+				ComputePads();
 				_frameIndex = 0;
 				_frameElapsed = 0;
 				if (state == "complete" || state == "yapping" || state == "yappingMouthOpen")
@@ -842,6 +1008,7 @@ namespace BlobbyDesktop
 			_bubbleImage.Width = size;
 			_bubbleImage.Height = size;
 			bool left = _currentState == "rendering" && _petLeft + _displaySize + 20 * _settings.Scale > _geometry.Right;
+			_bubbleOnLeft = left;
 			double leftPos = left ? _petLeft - 28 * _settings.Scale : _petLeft + 4 * _settings.Scale;
 			double topPos = _petTop - 32 * _settings.Scale;
 			Canvas.SetLeft(_bubbleImage, leftPos - _contentLeft);
@@ -859,6 +1026,12 @@ namespace BlobbyDesktop
 			if (delta < 0) delta = 0;
 			_lastTick = now;
 			if (delta > 250) delta = 250;
+			if (_prepared && _phase == Phase.Prepared)
+			{
+				CheckWatchdog(now);
+				WriteStatus(now);
+				return;
+			}
 			_state.Update(now, _model);
 			if (_phase == Phase.Airborne) UpdateAirborne(now);
 			else if (_phase == Phase.Starting) UpdateStart(now);
@@ -1046,15 +1219,27 @@ namespace BlobbyDesktop
 					break;
 				}
 			}
-			_bubbleImage.Source = animation.Right[Math.Min(index, animation.Right.Length - 1)];
-			PositionBubble();
+			if (index != _lastBubbleFrame)
+			{
+				_lastBubbleFrame = index;
+				_bubbleImage.Source = animation.Right[Math.Min(index, animation.Right.Length - 1)];
+			}
+			bool left = _currentState == "rendering" && _petLeft + _displaySize + 20 * _settings.Scale > _geometry.Right;
+			if (left != _bubbleOnLeft)
+			{
+				_bubbleOnLeft = left;
+				PositionBubble();
+			}
 		}
 
 		private void UpdateTransforms(long now)
 		{
 			if (_petHost == null) return;
-			TransformGroup group = new TransformGroup();
 			string state = _currentState;
+			string key;
+			Transform transform;
+			Point origin = new Point(0.5, 0.5);
+			RectangleGeometry clip = null;
 			if (state == "complete")
 			{
 				double duration = Math.Max(1, _model.Timings.Complete);
@@ -1065,9 +1250,12 @@ namespace BlobbyDesktop
 				double[] rotations = new double[] { 0, 51, 103, 154, 206, 257, 309, 360 };
 				double offset = offsets[Math.Min(step, offsets.Length - 1)] * _settings.Scale;
 				double angle = rotations[Math.Min(step, rotations.Length - 1)];
+				TransformGroup group = new TransformGroup();
 				group.Children.Add(new TranslateTransform(0, offset));
 				group.Children.Add(new RotateTransform(angle));
-				_petHost.RenderTransformOrigin = new Point(0.5, 0.6);
+				transform = group;
+				origin = new Point(0.5, 0.6);
+				key = "complete:" + step;
 			}
 			else if (state == "yapping")
 			{
@@ -1075,48 +1263,64 @@ namespace BlobbyDesktop
 				double elapsed = now - _transientStartedAt;
 				double fraction = Math.Max(0, Math.Min(1, elapsed / duration));
 				double stepped = Math.Floor(fraction * 4) / 4;
+				TransformGroup group = new TransformGroup();
 				group.Children.Add(new TranslateTransform(0, -4 * _settings.Scale * fraction));
 				group.Children.Add(new RotateTransform(-90 * stepped));
-				_petHost.RenderTransformOrigin = new Point(0.3, 0.8);
+				transform = group;
+				origin = new Point(0.3, 0.8);
+				key = "yapping:" + Math.Round(fraction * 20);
 			}
 			else if (state == "yappingMouthOpen")
 			{
+				TransformGroup group = new TransformGroup();
 				group.Children.Add(new TranslateTransform(0, -4 * _settings.Scale));
 				group.Children.Add(new RotateTransform(-90));
-				_petHost.RenderTransformOrigin = new Point(0.3, 0.8);
+				transform = group;
+				origin = new Point(0.3, 0.8);
+				key = "yappingMouthOpen";
 			}
 			else if (_state.OnTheRun)
 			{
 				bool peeking = _peekUntil > 0 && now < _peekUntil;
 				double offset = peeking ? _displaySize * (10.0 / 48.0) : _displaySize * (40.0 / 48.0);
+				TransformGroup group = new TransformGroup();
 				group.Children.Add(new TranslateTransform(0, offset));
-				_petHost.RenderTransformOrigin = new Point(0.5, 0.5);
-			}
-			else
-			{
-				if (_state.Dragging)
-				{
-					double phase = Math.Sin(now / 120.0);
-					group.Children.Add(new TranslateTransform(phase * 1 * _settings.Scale, 0));
-					group.Children.Add(new RotateTransform(phase * 1.0));
-				}
-				else if (_phase == Phase.Airborne)
-				{
-					group.Children.Add(new RotateTransform(_rotation));
-				}
-				_petHost.RenderTransformOrigin = new Point(0.5, 0.5);
-			}
-			_petHost.RenderTransform = group;
-			if (_state.OnTheRun)
-			{
-				bool peeking = _peekUntil > 0 && now < _peekUntil;
+				transform = group;
 				double visible = _displaySize * ((peeking ? 38.0 : 8.0) / 48.0);
-				_petHost.Clip = new RectangleGeometry(new Rect(0, 0, _displaySize, Math.Max(1, visible)));
+				clip = new RectangleGeometry(new Rect(0, 0, _displaySize, Math.Max(1, visible)));
+				key = "run:" + (peeking ? 1 : 0);
+			}
+			else if (_state.Dragging)
+			{
+				long phase = (now / 120) % 2;
+				double direction = phase == 0 ? -1 : 1;
+				TransformGroup group = new TransformGroup();
+				group.Children.Add(new TranslateTransform(direction * 2 * _settings.Scale, 0));
+				group.Children.Add(new RotateTransform(direction * 2));
+				transform = group;
+				key = "drag:" + phase;
+			}
+			else if (_phase == Phase.Airborne)
+			{
+				TransformGroup group = new TransformGroup();
+				group.Children.Add(new RotateTransform(_rotation));
+				transform = group;
+				key = "air:" + Math.Round(_rotation * 10);
 			}
 			else
 			{
-				_petHost.Clip = null;
+				transform = Transform.Identity;
+				key = "identity";
 			}
+			if (key != _transformKey)
+			{
+				_transformKey = key;
+				_petHost.RenderTransformOrigin = origin;
+				_petHost.RenderTransform = transform;
+			}
+			bool hasClip = clip != null;
+			if (hasClip || _lastClip) _petHost.Clip = clip;
+			_lastClip = hasClip;
 		}
 
 		private void UpdateAirborne(long now)
@@ -1286,7 +1490,12 @@ namespace BlobbyDesktop
 
 		private void OnMouseMove(object sender, MouseEventArgs e)
 		{
-			if (!_dragCandidate || _phase == Phase.Stopping || _phase == Phase.Stopped) return;
+			if (_phase == Phase.Stopping || _phase == Phase.Stopped) return;
+			Point hover = e.GetPosition(_window);
+			double hoverX = hover.X + _contentLeft;
+			double hoverY = hover.Y + _contentTop;
+			if (!_dragging && !_dragCandidate) UpdateHoverCursor(IsInsidePet(hoverX, hoverY));
+			if (!_dragCandidate) return;
 			if (e.LeftButton != MouseButtonState.Pressed) return;
 			Native.POINT cursor;
 			if (!Native.GetCursorPos(out cursor)) return;
@@ -1301,6 +1510,7 @@ namespace BlobbyDesktop
 				SetRenderedState("idle", Now());
 				SetPetVisibility(true);
 				SetBubbleVisibility(false);
+				_window.Cursor = _grabbingCursor ?? Cursors.Hand;
 			}
 			double left = _geometry.ClampLeft(_dragStartLeft + dx);
 			double top = Math.Max(_geometry.Top, Math.Min(_geometry.RestingTop, _dragStartTop + dy));
@@ -1321,6 +1531,10 @@ namespace BlobbyDesktop
 			bool wasDragging = _dragging;
 			_dragging = false;
 			_state.Dragging = false;
+			Native.POINT endPoint;
+			bool endOverPet = Native.GetCursorPos(out endPoint)
+				&& IsInsidePet((endPoint.X - _monitorPhysical.Left) / _dpiScale, (endPoint.Y - _monitorPhysical.Top) / _dpiScale);
+			UpdateHoverCursor(endOverPet);
 			bool onRun = _state.OnTheRun;
 			if (!wasDragging)
 			{
@@ -1455,9 +1669,15 @@ namespace BlobbyDesktop
 			_menuDip.Bottom = (int)Math.Round(top + height);
 			_menuOpen = true;
 			_menuBorder.Width = width;
+			// Grow and move the window while the menu is still hidden, then show it
+			// already positioned. Showing before the window resize made the menu
+			// flash at its old origin for one frame.
+			LayoutWindow(true);
+			_menuBorder.Measure(new Size(width, double.PositiveInfinity));
+			_menuBorder.Arrange(new Rect(0, 0, width, Math.Max(40, _menuBorder.DesiredSize.Height)));
+			_canvas.UpdateLayout();
 			_menuBorder.Visibility = Visibility.Visible;
 			InstallMouseHook();
-			LayoutWindow(true);
 		}
 
 		private void CloseMenu()
@@ -1596,6 +1816,7 @@ namespace BlobbyDesktop
 			_geometry.DisplaySize = _displaySize;
 			_petLeft = _geometry.ClampLeft(_petLeft);
 			if (_phase != Phase.Airborne) _petTop = _geometry.RestingTop;
+			ComputePads();
 			UpdatePetImage(true);
 			EmitSettings();
 			CloseMenu();
@@ -1625,6 +1846,7 @@ namespace BlobbyDesktop
 		{
 			_settings.DesktopDisplay = false;
 			_settings.SmartHide = false;
+			_disposeOnStop = true;
 			EmitSettings();
 			CloseMenu();
 			RequestStop(true, true, true, "desktop-disabled");
@@ -1660,13 +1882,31 @@ namespace BlobbyDesktop
 		{
 			if (now - _lastRestoreCheck < 500) return;
 			_lastRestoreCheck = now;
-			if (_phase == Phase.Stopping || _stopped) return;
+			if (_phase == Phase.Stopping || _phase == Phase.Prepared || _stopped) return;
 			if (_dshWindow == IntPtr.Zero || !Native.IsWindow(_dshWindow)) return;
-			if (!_dshWasIconic) return;
-			if (!Native.IsIconic(_dshWindow) && Native.IsWindowVisible(_dshWindow))
+			if (Native.IsIconic(_dshWindow)) return;
+			if (_dshWasIconic && Native.IsWindowVisible(_dshWindow))
 			{
 				RequestStop(false, false, false, "window-restored");
+				return;
 			}
+			if (IsDshForeground())
+			{
+				RequestStop(false, false, false, "dsh-focused");
+			}
+		}
+
+		private bool IsDshForeground()
+		{
+			IntPtr foreground = Native.GetForegroundWindowSafe();
+			if (foreground == IntPtr.Zero) return false;
+			if (foreground == _dshWindow) return true;
+			if (foreground == _hwnd) return false;
+			uint foregroundPid;
+			uint dshPid;
+			Native.GetWindowThreadProcessId(foreground, out foregroundPid);
+			Native.GetWindowThreadProcessId(_dshWindow, out dshPid);
+			return foregroundPid != 0 && foregroundPid == dshPid;
 		}
 
 		private void CheckWatchdog(long now)
@@ -1689,8 +1929,14 @@ namespace BlobbyDesktop
 		{
 			if (message == null) return;
 			string type = JsonRead.GetString(message, "type", "");
+			if (type == "show")
+			{
+				ShowPrepared(JsonRead.GetObject(message, "settings"), JsonRead.GetObject(message, "facts"));
+				return;
+			}
 			if (type == "stop")
 			{
+				_disposeOnStop = JsonRead.GetBool(message, "dispose", false);
 				RequestStop(false, false, false, "host-stop");
 				return;
 			}
@@ -1707,15 +1953,58 @@ namespace BlobbyDesktop
 				_geometry.DisplaySize = _displaySize;
 				_petLeft = _geometry.ClampLeft(_petLeft);
 				if (_phase != Phase.Airborne) _petTop = _geometry.RestingTop;
+				ComputePads();
 				ApplyTopmost();
 				LayoutWindow(true);
 				return;
 			}
 		}
 
+		private void ShowPrepared(Dictionary<string, object> settings, Dictionary<string, object> facts)
+		{
+			if (_stopped) return;
+			if (settings != null)
+			{
+				_settings.Apply(settings);
+				_displaySize = _model.Sizes.Display * _settings.Scale;
+				_geometry.DisplaySize = _displaySize;
+				_petLeft = _geometry.ClampLeft(_petLeft);
+				_petTop = _geometry.RestingTop;
+				ComputePads();
+			}
+			if (facts != null) _facts.Apply(facts);
+			_prepared = false;
+			_disposeOnStop = false;
+			_phase = Phase.Starting;
+			_window.Cursor = Cursors.Arrow;
+			_window.Opacity = 1;
+			if (!_window.IsVisible) _window.Show();
+			_startedAt = Now();
+			_lastTick = _startedAt;
+			_state.SetFacts(_facts, _model, _startedAt);
+			_state.OnTheRun = _settings.OnTheRun;
+			_state.ResetIdle(_startedAt, _model);
+			BeginStart();
+			_timer.Stop();
+			StartRendering();
+			ApplyTopmost();
+			LayoutWindow(true);
+			Dictionary<string, object> shown = new Dictionary<string, object>();
+			shown["type"] = "shown";
+			Program.Emit(shown);
+		}
+
 		public void RequestStop(bool immediate, bool restore, bool focus, string reason)
 		{
 			if (_stopped || _phase == Phase.Stopping) return;
+			if (_phase == Phase.Prepared)
+			{
+				_stopReason = reason;
+				_stopRestore = restore;
+				_stopFocus = focus;
+				FinishStop();
+				return;
+			}
 			_stopReason = reason;
 			if (immediate)
 			{
@@ -1738,10 +2027,61 @@ namespace BlobbyDesktop
 
 		public void StopImmediately(string reason)
 		{
+			_disposeOnStop = true;
 			RequestStop(true, false, false, reason);
 		}
 
 		private void FinishStop()
+		{
+			if (_stopped) return;
+			if (_disposeOnStop)
+			{
+				FinishExit();
+				return;
+			}
+			HideToPrepared();
+		}
+
+		private void HideToPrepared()
+		{
+			_phase = Phase.Prepared;
+			_prepared = true;
+			ShowPortal(false);
+			SetPetVisibility(false);
+			SetBubbleVisibility(false);
+			CloseMenu();
+			UninstallMouseHook();
+			if (_window != null)
+			{
+				try
+				{
+					_window.Hide();
+				}
+				catch (Exception)
+				{
+				}
+				_window.Cursor = Cursors.Arrow;
+			}
+			_rotation = 0;
+			_airborne = false;
+			_state.Airborne = false;
+			_state.Dragging = false;
+			_dragging = false;
+			_dragCandidate = false;
+			_petTop = _geometry.RestingTop;
+			_petLeft = AnchoredLeft();
+			_lastTick = Now();
+			StopRendering();
+			_timer.Interval = TimeSpan.FromMilliseconds(500);
+			_timer.Start();
+			if (_stopRestore) Native.RestoreWindow(_dshWindow, _stopFocus);
+			Dictionary<string, object> payload = new Dictionary<string, object>();
+			payload["type"] = "hidden";
+			payload["settings"] = _settings.ToJson();
+			Program.Emit(payload);
+		}
+
+		private void FinishExit()
 		{
 			if (_stopped) return;
 			_stopped = true;
@@ -1772,6 +2112,7 @@ namespace BlobbyDesktop
 
 		private void ShutdownResources()
 		{
+			StopRendering();
 			if (_timer != null)
 			{
 				_timer.Stop();
@@ -1955,3 +2296,7 @@ namespace BlobbyDesktop
 		}
 	}
 }
+
+
+
+

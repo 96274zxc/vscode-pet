@@ -2,7 +2,8 @@ param(
 	[Parameter(Position = 0)][string]$ManifestPath = '',
 	[Parameter(Position = 1)][string]$ParentPid = '0',
 	[switch]$Warmup,
-	[switch]$SelfTest
+	[switch]$SelfTest,
+	[switch]$Prepared
 )
 
 $ErrorActionPreference = 'Stop'
@@ -86,7 +87,8 @@ if ($SelfTest) {
 }
 
 try {
-	$code = [BlobbyDesktop.Program]::Run($ManifestPath, $ParentPid)
+	$preparedFlag = if ($Prepared) { '1' } else { '0' }
+	$code = [BlobbyDesktop.Program]::Run($ManifestPath, $ParentPid, $preparedFlag)
 	exit $code
 } catch {
 	[Console]::Error.WriteLine('blobby-desktop: run failed: ' + $_.Exception.Message)

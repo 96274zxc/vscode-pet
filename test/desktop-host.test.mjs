@@ -62,7 +62,11 @@ class FakeChild extends EventEmitter {
 			writable: true,
 			write: line => {
 				this.stdinLines.push(line)
-				if (line.includes('"stop"')) setImmediate(() => this.emit('exit', 0, null))
+				if (line.includes('"show"')) setImmediate(() => this.stdout.write('{"type":"shown"}\n'))
+				if (line.includes('"stop"')) {
+					if (line.includes('"dispose":true')) setImmediate(() => this.emit('exit', 0, null))
+					else setImmediate(() => this.stdout.write('{"type":"hidden"}\n'))
+				}
 				return true
 			},
 			on: () => {},
@@ -168,10 +172,13 @@ test('helper manager starts, streams settings, answers pending reads and stops',
 		const stopped = await manager.stop(started.session)
 		assert.equal(stopped.command, 'hats')
 		assert.equal(stopped.settings.scale, 1.4)
-		assert.equal(existsSync(path.join(tempRoot, started.session)), false)
-		assert.equal(manager.session, undefined)
+		assert.equal(existsSync(path.join(tempRoot, started.session)), true)
+		assert.ok(manager.session)
 		const again = await manager.stop(started.session)
 		assert.equal(again.settings.scale, 1.4)
+		await manager.stop(started.session, { dispose: true })
+		assert.equal(existsSync(path.join(tempRoot, started.session)), false)
+		assert.equal(manager.session, undefined)
 	} finally {
 		manager.dispose()
 		await rm(tempRoot, { recursive: true, force: true })
@@ -185,6 +192,34 @@ test('helper manager refuses non-Windows platforms', async () => {
 		assert.equal(manager.supported, false)
 		await assert.rejects(manager.start(makeBundle()), error => error.status === 501)
 		await assert.rejects(manager.warmup(), error => error.status === 501)
+	} finally {
+		manager.dispose()
+		await rm(tempRoot, { recursive: true, force: true })
+	}
+})
+
+test('prepared helper is reused for a fast start and survives a stop', async () => {
+	const { manager, tempRoot, spawn } = await makeManager()
+	try {
+		const prepared = await manager.prepare(makeBundle())
+		assert.equal(prepared.prepared, true)
+		assert.ok(spawn.spawned[0].args.includes('-Prepared'))
+		const child = spawn.spawned[0].child
+		assert.ok(!child.stdinLines.some(line => line.includes('"show"')))
+		const started = await manager.start(makeBundle())
+		assert.equal(started.session, prepared.session)
+		assert.equal(spawn.spawned.length, 1)
+		assert.equal(child.stdinLines.filter(line => line.includes('"show"')).length, 1)
+		const stopped = await manager.stop(started.session)
+		assert.ok(stopped.settings)
+		assert.equal(existsSync(path.join(tempRoot, started.session)), true)
+		const restarted = await manager.start(makeBundle())
+		assert.equal(restarted.session, started.session)
+		assert.equal(spawn.spawned.length, 1)
+		assert.equal(child.stdinLines.filter(line => line.includes('"show"')).length, 2)
+		await manager.stop(started.session, { dispose: true })
+		assert.equal(manager.session, undefined)
+		assert.equal(existsSync(path.join(tempRoot, started.session)), false)
 	} finally {
 		manager.dispose()
 		await rm(tempRoot, { recursive: true, force: true })
