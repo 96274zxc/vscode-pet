@@ -1838,9 +1838,74 @@ namespace BlobbyDesktop
 			ComputePads();
 			UpdatePetImage(true);
 			EmitSettings();
-			CloseMenu();
+			// Keep the menu open and anchored where the user clicked, like the
+			// in-window menu, so the size buttons can be clicked repeatedly.
+			if (_menuOpen) RefreshMenuInPlace();
+			else LayoutWindow(true);
+		}
+
+		private void RefreshMenuInPlace()
+		{
+			if (!_menuOpen || _menuBorder == null) return;
+			double width = Math.Max(200, _menuDip.Right - _menuDip.Left);
 			BuildMenu();
+			_menuBorder.Width = width;
+			_menuBorder.Measure(new Size(width, double.PositiveInfinity));
+			double height = Math.Max(40, _menuBorder.DesiredSize.Height);
+			_menuDip.Right = (int)Math.Round(_menuDip.Left + width);
+			_menuDip.Bottom = (int)Math.Round(_menuDip.Top + height);
+			_menuBorder.Arrange(new Rect(0, 0, width, height));
+			_menuBorder.Visibility = Visibility.Visible;
+			_canvas.UpdateLayout();
 			LayoutWindow(true);
+		}
+
+		private void ApplyMenuTheme()
+		{
+			if (_menuBorder == null) return;
+			_menuBorder.Background = new SolidColorBrush(_manifest.Theme.Background);
+			_menuBorder.BorderBrush = new SolidColorBrush(_manifest.Theme.Border);
+		}
+
+		private void ApplyFactsVisuals()
+		{
+			bool changed = false;
+			if (_facts.Theme != null && !SameTheme(_facts.Theme, _manifest.Theme))
+			{
+				_manifest.Theme = _facts.Theme;
+				ApplyMenuTheme();
+				changed = true;
+			}
+			if (_facts.Labels != null && !SameLabels(_facts.Labels, _manifest.Labels))
+			{
+				_manifest.Labels = new Dictionary<string, string>(_facts.Labels);
+				changed = true;
+			}
+			if (changed && _menuOpen) RefreshMenuInPlace();
+		}
+
+		private static bool SameTheme(DesktopTheme left, DesktopTheme right)
+		{
+			if (left == null || right == null) return left == right;
+			return left.Dark == right.Dark
+				&& left.Background == right.Background
+				&& left.Text == right.Text
+				&& left.Muted == right.Muted
+				&& left.Hover == right.Hover
+				&& left.Border == right.Border
+				&& left.Accent == right.Accent;
+		}
+
+		private static bool SameLabels(Dictionary<string, string> left, Dictionary<string, string> right)
+		{
+			if (left == null || right == null) return left == right;
+			if (left.Count != right.Count) return false;
+			foreach (KeyValuePair<string, string> pair in left)
+			{
+				string value;
+				if (!right.TryGetValue(pair.Key, out value) || value != pair.Value) return false;
+			}
+			return true;
 		}
 
 		private void ToggleSmartHide()
@@ -1963,6 +2028,7 @@ namespace BlobbyDesktop
 			{
 				_facts.Apply(JsonRead.GetObject(message, "facts"));
 				_state.SetFacts(_facts, _model, Now());
+				ApplyFactsVisuals();
 				return;
 			}
 			if (type == "settings")
@@ -1991,7 +2057,11 @@ namespace BlobbyDesktop
 				_petTop = _geometry.RestingTop;
 				ComputePads();
 			}
-			if (facts != null) _facts.Apply(facts);
+			if (facts != null)
+			{
+				_facts.Apply(facts);
+				ApplyFactsVisuals();
+			}
 			_prepared = false;
 			_disposeOnStop = false;
 			_phase = Phase.Starting;
@@ -2288,12 +2358,10 @@ namespace BlobbyDesktop
 					try
 					{
 						List<object> items = new List<object>();
-						foreach (UIElement child in _menuStack.Children)
+						Action<FrameworkElement> addItem = element =>
 						{
-							FrameworkElement element = child as FrameworkElement;
-							if (element == null) continue;
-							string label = element.Tag as string;
-							if (string.IsNullOrEmpty(label)) continue;
+							string label = element == null ? null : element.Tag as string;
+							if (string.IsNullOrEmpty(label)) return;
 							Point position = element.TranslatePoint(new Point(0, 0), _canvas);
 							Dictionary<string, object> item = new Dictionary<string, object>();
 							item["label"] = label;
@@ -2302,6 +2370,21 @@ namespace BlobbyDesktop
 							item["width"] = element.ActualWidth;
 							item["height"] = element.ActualHeight;
 							items.Add(item);
+						};
+						foreach (UIElement child in _menuStack.Children)
+						{
+							FrameworkElement element = child as FrameworkElement;
+							if (element == null) continue;
+							if (element.Tag is string)
+							{
+								addItem(element);
+								continue;
+							}
+							Border wrapper = element as Border;
+							if (wrapper == null) continue;
+							Grid grid = wrapper.Child as Grid;
+							if (grid == null) continue;
+							foreach (UIElement inner in grid.Children) addItem(inner as FrameworkElement);
 						}
 						status["menuItems"] = items.ToArray();
 					}

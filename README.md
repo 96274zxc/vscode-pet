@@ -47,7 +47,9 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   Run, size controls, Show on Desktop and Smart Hide work on the desktop itself. Throws always land
   on the taskbar/screen floor and never trigger a fall respawn. The helper window ends exactly at the
   taskbar and only the pet/menu accept clicks, so the taskbar and windows underneath stay usable; the
-  menu is positioned before it is shown. The helper renders on the composition loop with subpixel
+  menu is positioned before it is shown and keeps its size rows open for repeated clicks, and it
+  follows the DSH light/dark palette and current UI language. The helper renders on the composition
+  loop with subpixel
   position compensation and no per-frame topmost churn, so its motion matches the in-window pet
   instead of sliding on the window's pixel grid. It also adopts the exact grab cursor used by DSH by
   capturing the rendered pet's cursor at runtime (no separate cursor asset), together with the same

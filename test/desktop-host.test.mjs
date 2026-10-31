@@ -142,6 +142,14 @@ test('desktop settings, facts and commands normalize independently', () => {
 	assert.equal(cursorFacts.grabbing, true)
 	assert.deepEqual(cursorFacts.petRect, { left: 10, top: 20, width: 30, height: 40 })
 	assert.equal(normalizeDesktopFacts({ petRect: { left: 10, top: 20, width: 0, height: 40 } }).petRect, undefined)
+	const visualFacts = normalizeDesktopFacts({
+		theme: { dark: false, menuBackground: '#ffffff', menuText: '#1f2329', menuMuted: '#6b7280', menuHover: '#f1f2f4', menuBorder: '#e3e5e8', accent: '#4d6bfe' },
+		labels: Object.fromEntries(LABEL_KEYS.map(key => [key, 'x-' + key])),
+	})
+	assert.equal(visualFacts.theme.dark, false)
+	assert.equal(visualFacts.theme.menuBackground, '#ffffff')
+	assert.equal(visualFacts.labels['menu.hats'], 'x-menu.hats')
+	assert.equal(normalizeDesktopFacts({ labels: { 'menu.hats': '' } }).labels, undefined)
 	assert.equal(sanitizeDesktopCommand('hats'), 'hats')
 	assert.equal(sanitizeDesktopCommand('rm -rf'), undefined)
 	assert.equal(isDesktopRequestSupported('win32', true), true)

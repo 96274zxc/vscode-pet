@@ -192,6 +192,8 @@ namespace BlobbyDesktop
 		public double PetTop;
 		public double PetWidth;
 		public double PetHeight;
+		public DesktopTheme Theme;
+		public Dictionary<string, string> Labels;
 
 		public static DesktopFacts From(Dictionary<string, object> source)
 		{
@@ -206,6 +208,18 @@ namespace BlobbyDesktop
 			if (source.ContainsKey("running")) Running = JsonRead.GetBool(source, "running", Running);
 			if (source.ContainsKey("pendingInteraction")) PendingInteraction = JsonRead.GetBool(source, "pendingInteraction", PendingInteraction);
 			if (source.ContainsKey("grabbing")) Grabbing = JsonRead.GetBool(source, "grabbing", Grabbing);
+			if (source.ContainsKey("theme")) Theme = DesktopTheme.From(JsonRead.GetObject(source, "theme"));
+			if (source.ContainsKey("labels"))
+			{
+				Dictionary<string, object> labels = JsonRead.GetObject(source, "labels");
+				Dictionary<string, string> next = new Dictionary<string, string>();
+				foreach (KeyValuePair<string, object> pair in labels)
+				{
+					string value = JsonRead.String(pair.Value, null);
+					if (!string.IsNullOrEmpty(value)) next[pair.Key] = value;
+				}
+				if (next.Count > 0) Labels = next;
+			}
 			Dictionary<string, object> rect = JsonRead.GetObject(source, "petRect");
 			if (rect != null)
 			{

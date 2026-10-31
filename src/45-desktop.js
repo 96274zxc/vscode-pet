@@ -219,35 +219,103 @@ function getChatPetDesktopMenuLabels(t) {
 	return labels
 }
 
-function getChatPetDesktopTheme() {
-	let dark = true
+let chatPetDesktopThemeCanvas
+
+function normalizeDesktopThemeColor(value) {
+	if (typeof value !== 'string' || value.trim().length === 0) return undefined
 	try {
-		const value = getComputedStyle(document.body).backgroundColor
-		const match = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/.exec(value)
-		if (match) {
-			const [r, g, b] = [Number(match[1]), Number(match[2]), Number(match[3])]
-			dark = 0.2126 * r + 0.7152 * g + 0.0722 * b < 128
+		if (!chatPetDesktopThemeCanvas) chatPetDesktopThemeCanvas = document.createElement('canvas')
+		const context = chatPetDesktopThemeCanvas.getContext('2d')
+		if (!context) return undefined
+		context.fillStyle = '#000000'
+		context.fillStyle = value.trim()
+		const normalized = String(context.fillStyle)
+		const match = /^rgba?\(([^)]+)\)$/.exec(normalized)
+		if (!match) return undefined
+		const parts = match[1].split(',').map(part => Number(part.trim()))
+		if (parts.length < 3 || !parts.slice(0, 3).every(Number.isFinite)) return undefined
+		return {
+			r: parts[0],
+			g: parts[1],
+			b: parts[2],
+			a: parts.length > 3 && Number.isFinite(parts[3]) ? Math.max(0, Math.min(1, parts[3])) : 1,
 		}
-	} catch (ignored) { /* keep the dark palette */ }
-	return dark
-		? {
-			dark: true,
-			menuBackground: '#26272b',
-			menuText: '#f2f3f5',
-			menuMuted: '#9a9ca3',
-			menuHover: '#3a3b40',
-			menuBorder: '#414248',
-			accent: '#4d6bfe',
+	} catch (ignored) {
+		return undefined
+	}
+}
+
+function desktopThemeHex(color) {
+	if (!color) return undefined
+	const channel = value => Math.max(0, Math.min(255, Math.round(value))).toString(16).padStart(2, '0')
+	return `#${channel(color.r)}${channel(color.g)}${channel(color.b)}`
+}
+
+function blendDesktopThemeColor(top, bottom) {
+	if (!top) return bottom
+	if (!bottom || top.a >= 1) return top
+	return {
+		r: top.r * top.a + bottom.r * (1 - top.a),
+		g: top.g * top.a + bottom.g * (1 - top.a),
+		b: top.b * top.a + bottom.b * (1 - top.a),
+		a: 1,
+	}
+}
+
+function getChatPetDesktopTheme() {
+	const darkPalette = {
+		dark: true,
+		menuBackground: '#26272b',
+		menuText: '#f2f3f5',
+		menuMuted: '#9a9ca3',
+		menuHover: '#3a3b40',
+		menuBorder: '#414248',
+		accent: '#4d6bfe',
+	}
+	const lightPalette = {
+		dark: false,
+		menuBackground: '#ffffff',
+		menuText: '#1f2329',
+		menuMuted: '#6b7280',
+		menuHover: '#f1f2f4',
+		menuBorder: '#e3e5e8',
+		accent: '#4d6bfe',
+	}
+	try {
+		const documentStyle = getComputedStyle(document.documentElement)
+		const bodyStyle = getComputedStyle(document.body)
+		const readColor = name => normalizeDesktopThemeColor(documentStyle.getPropertyValue(name))
+			?? normalizeDesktopThemeColor(bodyStyle.getPropertyValue(name))
+		const colorScheme = String(documentStyle.colorScheme || documentStyle.getPropertyValue('color-scheme') || '')
+		let dark = colorScheme.includes('dark') ? true : colorScheme.includes('light') ? false : undefined
+		const bodyBackground = normalizeDesktopThemeColor(bodyStyle.backgroundColor)
+		const base = (bodyBackground && bodyBackground.a >= 1 ? bodyBackground : undefined)
+			?? readColor('--dsw-alias-bg-base')
+			?? normalizeDesktopThemeColor(dark === true ? '#26272b' : '#ffffff')
+		const menuSource = readColor('--dsw-specific-menu')
+		const menuBackground = menuSource ? blendDesktopThemeColor(menuSource, base) : base
+		if (dark === undefined && menuBackground) dark = 0.2126 * menuBackground.r + 0.7152 * menuBackground.g + 0.0722 * menuBackground.b < 128
+		if (dark === undefined) dark = true
+		const fallback = dark ? darkPalette : lightPalette
+		const text = readColor('--dsw-alias-label-primary') ?? normalizeDesktopThemeColor(fallback.menuText)
+		const muted = readColor('--dsw-alias-label-tertiary') ?? normalizeDesktopThemeColor(fallback.menuMuted)
+		const hoverSource = readColor('--dsw-alias-interactive-bg-hover')
+		const hover = hoverSource ? blendDesktopThemeColor(hoverSource, menuBackground) : normalizeDesktopThemeColor(fallback.menuHover)
+		const borderSource = readColor('--dsw-alias-border-l1')
+		const border = borderSource ? blendDesktopThemeColor(borderSource, menuBackground) : normalizeDesktopThemeColor(fallback.menuBorder)
+		const accent = readColor('--dsw-alias-brand-primary') ?? normalizeDesktopThemeColor(fallback.accent)
+		return {
+			dark,
+			menuBackground: desktopThemeHex(menuBackground),
+			menuText: desktopThemeHex(text),
+			menuMuted: desktopThemeHex(muted),
+			menuHover: desktopThemeHex(hover),
+			menuBorder: desktopThemeHex(border),
+			accent: desktopThemeHex(accent),
 		}
-		: {
-			dark: false,
-			menuBackground: '#ffffff',
-			menuText: '#1f2329',
-			menuMuted: '#6b7280',
-			menuHover: '#f1f2f4',
-			menuBorder: '#e3e5e8',
-			accent: '#4d6bfe',
-		}
+	} catch (ignored) {
+		return darkPalette
+	}
 }
 
 /* ---------------------------------------------------------------- painter */
@@ -536,6 +604,8 @@ class ChatPetDesktopBridge {
 			running: this.controller?.running === true,
 			pendingInteraction: this.controller?.pending === true,
 			grabbing: this.controller?.dragging === true,
+			theme: getChatPetDesktopTheme(),
+			labels: getChatPetDesktopMenuLabels(this.getT()),
 		}
 		const petRect = getChatPetDesktopPetScreenRect(this.controller)
 		if (petRect) facts.petRect = petRect

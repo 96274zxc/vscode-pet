@@ -105,6 +105,14 @@ export function normalizeDesktopFacts(raw) {
 		pendingInteraction: readBoolean(source.pendingInteraction, false),
 	}
 	if (readBoolean(source.grabbing, false)) facts.grabbing = true
+	if (isRecord(source.theme)) facts.theme = normalizeDesktopTheme(source.theme)
+	if (isRecord(source.labels)) {
+		try {
+			facts.labels = normalizeDesktopLabels(source.labels)
+		} catch (ignored) {
+			/* keep the last labels; a transient translation should not fail facts */
+		}
+	}
 	if (isRecord(source.petRect)) {
 		const left = Number(source.petRect.left)
 		const top = Number(source.petRect.top)
