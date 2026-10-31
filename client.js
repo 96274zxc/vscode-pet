@@ -2570,6 +2570,8 @@ class ChatPetDesktopBridge {
 			states: frames.states,
 			bubble: frames.bubble,
 			respawn: frames.respawn,
+			blink: frames.blink,
+			gaze: frames.gaze,
 		}
 	}
 
