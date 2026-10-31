@@ -81,6 +81,25 @@ thinking 气泡。主图为 144×144（插件卡片 36px 的 4 倍），`icons/i
 - **可访问性**：`prefers-reduced-motion`、键盘操作、`aria-live` 状态播报、焦点管理和错误边界。
 - **显示开关**：`/vscode-pet` 可隐藏/重新显示宠物，不影响插件安装状态。
 
+## 性能与内存
+
+- 桌面 helper 按需加载动画帧：prepared 阶段只解码 idle、blink、gaze 覆盖层（基准 bundle 140 帧中的
+  7 帧，约 0.26 MB，原来一次性解码 6.26 MB）；其余状态/效果在首次使用时才解码对应 PNG。同一次基准中
+  prepared helper 从约 117.7 MB 降到约 103.2 MB 工作集（私有内存约 119.5 MB → 99.7 MB）。
+- prepared helper 在 DSH 聚焦期间复用，用于桌面秒开；如果客户端停止发送 250ms facts 心跳超过 5 分钟，
+  host 会回收 helper，崩溃/重载的页面不会留下隐藏的 PowerShell/WPF 进程和临时帧。
+- 客户端图片按需加载：只预取当前佩戴的帽子；帽子面板预览自行加载 accessory，并在面板关闭时释放
+  非佩戴帽子的图片；自定义色 sprite 缓存上限为 1 MP，并改为 LRU 淘汰。
+- 桌面主题最多每 2 秒重新检测一次并缓存，菜单文案按 locale 版本缓存；250ms 的 facts 只在
+  `theme`/`labels` 变化时携带它们，helper 在缺省时保留上次值。
+- 桌面帧烘焙每批复用一个 canvas（PNG payload 逐字节一致）；跳跳乐会剪掉相机下方的平台/墙；widget、
+  slot 和 desktop bridge 的 teardown 会释放定时器、observer、空闲预加载、debug API 与帧缓存。
+- 诊断：加 `?blobbyDebug=1`（或 `localStorage.dshBlobbyDebug=1`）后，
+  `window.__dshBlobby.memory()` 会报告 JS heap、图片/颜色缓存大小、桌面帧字节数、定时器/监听器/DOM
+  数量；helper 的 `status.json` 会报告 `frames: {loaded,total,bytes}`。
+- helper 剩余的主要占用来自 PowerShell 5.1 + .NET/WPF 运行时本身；要移除它需要更换 helper 宿主，
+  不在当前实现范围内。
+
 ## 安装
 
 当前 npm 包因账号 2FA 安全冻结暂未发布；可以先从公开 GitHub 仓库源码安装：
