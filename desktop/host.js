@@ -598,9 +598,12 @@ export class DesktopHelperManager {
 	sweep() {
 		if (this.disposed) return
 		const session = this.session
-		if (!session || session.prepared) return
+		if (!session) return
 		if (Date.now() - session.lastPollAt > HEARTBEAT_TIMEOUT) {
-			this.logger.warn?.('[vscode-pet:desktop] stopping an idle desktop helper')
+			// Prepared helpers are long-lived for a fast start; reclaim them too
+			// when the client page stops sending facts (crash/reload), otherwise a
+			// hidden PowerShell/WPF process and its temp frames leak forever.
+			this.logger.warn?.(`[vscode-pet:desktop] stopping an idle ${session.prepared ? 'prepared ' : ''}desktop helper`)
 			this._kill(session)
 			this._cleanupSession(session)
 		}

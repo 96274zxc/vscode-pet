@@ -245,6 +245,29 @@ test('prepared helper is reused for a fast start and survives a stop', async () 
 	}
 })
 
+test('sweep reclaims a prepared helper that stopped sending facts', async () => {
+	const { manager, tempRoot } = await makeManager()
+	try {
+		await manager.prepare(makeBundle())
+		const session = manager.session
+		assert.equal(session.prepared, true)
+		session.lastPollAt = Date.now()
+		manager.sweep()
+		assert.ok(manager.session, 'a prepared helper with fresh heartbeats stays alive')
+		const child = session.child
+		session.lastPollAt = Date.now() - 6 * 60 * 1000
+		manager.sweep()
+		assert.equal(child.killed, true)
+		assert.equal(manager.session, undefined)
+		const deadline = Date.now() + 1000
+		while (existsSync(path.join(tempRoot, session.id)) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10))
+		assert.equal(existsSync(path.join(tempRoot, session.id)), false)
+	} finally {
+		manager.dispose()
+		await rm(tempRoot, { recursive: true, force: true })
+	}
+})
+
 test('desktop routes expose capabilities and drive a fake helper', async () => {
 	const { manager, tempRoot } = await makeManager()
 	try {

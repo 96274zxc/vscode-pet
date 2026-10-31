@@ -748,8 +748,11 @@ namespace BlobbyDesktop
 				Sleeping = false;
 				IdleExpiredAt = 0;
 			}
-			else
+			else if (wasBusy)
 			{
+				// The 250ms facts heartbeat must not keep postponing sleep: only a
+				// busy->idle transition starts a fresh idle window, like the
+				// in-window setFacts/recompute path.
 				ResetIdle(now, model);
 			}
 			// Same completion reaction as the in-window pet: a finished (not
@@ -787,6 +790,7 @@ namespace BlobbyDesktop
 		{
 			if (Transient == "achievementUnlocked" && state != "achievementUnlocked") return;
 			Transient = state;
+			ResetIdle(now, model);
 			if (state == "yapping")
 			{
 				TransientUntil = now + 480;
@@ -1072,6 +1076,15 @@ namespace BlobbyDesktop
 			factsWakeMachine.SetFacts(new DesktopFacts { Running = true }, model, now + (long)model.Timings.IdleSleep + 2);
 			Check(failures, "facts wake shows waking", factsWakeMachine.RenderState(model, now + (long)model.Timings.IdleSleep + 2) == "waking", factsWakeMachine.RenderState(model, now + (long)model.Timings.IdleSleep + 2));
 			checks.Add("facts-wake-waking");
+			DesktopStateMachine idleHeartbeatMachine = new DesktopStateMachine();
+			idleHeartbeatMachine.ResetIdle(now, model);
+			long heartbeatDeadline = idleHeartbeatMachine.IdleExpiredAt;
+			idleHeartbeatMachine.SetFacts(new DesktopFacts(), model, now + 5000);
+			Check(failures, "repeated facts keep the idle deadline", idleHeartbeatMachine.IdleExpiredAt == heartbeatDeadline, idleHeartbeatMachine.IdleExpiredAt.ToString(CultureInfo.InvariantCulture));
+			idleHeartbeatMachine.SetFacts(new DesktopFacts { Running = true }, model, now + 6000);
+			idleHeartbeatMachine.SetFacts(new DesktopFacts { Running = false }, model, now + 7000);
+			Check(failures, "busy end resets the idle deadline", idleHeartbeatMachine.IdleExpiredAt == now + 7000 + (long)model.Timings.IdleSleep, idleHeartbeatMachine.IdleExpiredAt.ToString(CultureInfo.InvariantCulture));
+			checks.Add("facts-keep-idle");
 			DesktopStateMachine yapMachine = new DesktopStateMachine();
 			string yap = yapMachine.Click(model, new FixedRandom(0.015), now, true);
 			Check(failures, "reduced motion yapping", yap == "yappingMouthOpen" && yapMachine.RenderState(model, now + 1) == "yappingMouthOpen", yap);
