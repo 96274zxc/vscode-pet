@@ -62,12 +62,14 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   while a turn is running). The desktop state machine also mirrors the window: typing while the
   composer has input, waking when facts wake it, **buttonPress** when a request completes (silent
   when cancelled), dizzy after quick cursor wiggles, reduced-motion variants, and eyes during the
-  typing/buttonPress/love poses. Remaining known differences: the desktop never falls to a respawn
-  death (taskbar floor), the jump game opens in DSH, the DSH port does not track achievements, and
-  the periodic blink, cursor-following pupils, bounce counter and 20-bounce confetti are not baked
-  into the desktop frames. The facing follows the cursor only in the idle pose; sleeping, waking,
-  typing, rendering, clapping and reaction poses keep the direction they had when they started,
-  matching the window's ChatPetFacingController.
+  typing/buttonPress/love poses. The periodic blink is implemented as a tiny transparent eye
+  overlay (body-colored pupil covers + the 2px clipped pupil lines) shown for 260ms at 1.4–3.4s
+  intervals, matching the window's ChatPetBlinkController and disabled under reduced motion.
+  Remaining known differences: the desktop never falls to a respawn death (taskbar floor), the jump
+  game opens in DSH, the DSH port does not track achievements, and cursor-following pupils, the
+  bounce counter and 20-bounce confetti are not baked into the desktop frames. The facing follows
+  the cursor only in the idle pose; sleeping, waking, typing, rendering, clapping and reaction poses
+  keep the direction they had when they started, matching the window's ChatPetFacingController.
   **Smart Hide** keeps the pet on the desktop only instead of above other applications. The native
   helper exits with DSH; on non-Windows the menu items are absent and the host refuses to start the
   helper, and the plain Web GUI hides the items as well.

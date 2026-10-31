@@ -445,6 +445,10 @@ namespace BlobbyDesktop
 		private Canvas _canvas;
 		private Canvas _petHost;
 		private Image _petImage;
+		private Image _blinkImage;
+		private bool _blinking;
+		private long _blinkAt;
+		private long _blinkUntil;
 		private Image _portalImage;
 		private Image _bubbleImage;
 		private Border _menuBorder;
@@ -707,6 +711,13 @@ namespace BlobbyDesktop
 			_petImage.Stretch = Stretch.Fill;
 			RenderOptions.SetBitmapScalingMode(_petImage, BitmapScalingMode.NearestNeighbor);
 			_petHost.Children.Add(_petImage);
+			_blinkImage = new Image();
+			_blinkImage.Stretch = Stretch.Fill;
+			_blinkImage.Visibility = Visibility.Hidden;
+			_blinkImage.IsHitTestVisible = false;
+			RenderOptions.SetBitmapScalingMode(_blinkImage, BitmapScalingMode.NearestNeighbor);
+			if (_manifest.Blink != null && _manifest.Blink.Right.Length > 0) _blinkImage.Source = _manifest.Blink.Right[0];
+			_petHost.Children.Add(_blinkImage);
 			_canvas.Children.Add(_petHost);
 			_menuBorder = new Border();
 			_menuBorder.Visibility = Visibility.Hidden;
@@ -1031,6 +1042,81 @@ namespace BlobbyDesktop
 			_petImage.RenderTransform = mirrored ? new ScaleTransform(-1, 1) : Transform.Identity;
 			_petHost.Width = _displaySize;
 			_petHost.Height = _displaySize;
+			if (_blinkImage != null) UpdateBlinkPosition();
+		}
+
+		private bool IsEyesBobbed()
+		{
+			return (_currentState == "idle" || _currentState == "rendering" || _currentState == "achievementUnlocked") && _frameIndex >= 20;
+		}
+
+		private void UpdateBlinkPosition()
+		{
+			if (_blinkImage == null || _petImage == null) return;
+			_blinkImage.Width = _petImage.Width;
+			_blinkImage.Height = _petImage.Height;
+			Canvas.SetLeft(_blinkImage, Canvas.GetLeft(_petImage));
+			double bob = IsEyesBobbed() ? 4.0 * _petImage.Height / 96.0 : 0;
+			Canvas.SetTop(_blinkImage, Canvas.GetTop(_petImage) + bob);
+			_blinkImage.RenderTransformOrigin = new Point(0.5, 0.5);
+			_blinkImage.RenderTransform = _petImage.RenderTransform;
+		}
+
+		private bool IsBlinkableState()
+		{
+			if (_state.Dragging || _phase != Phase.Resting) return false;
+			switch (_currentState)
+			{
+				case "idle":
+				case "rendering":
+				case "achievementUnlocked":
+				case "clapping":
+				case "yapping":
+				case "typing":
+				case "painting":
+				case "love":
+					return true;
+				case "buttonPress":
+					// The last buttonPress frame has no eye overlay at all.
+					return _currentAnimation != null && _frameIndex < _currentAnimation.Right.Length - 1;
+				default:
+					return false;
+			}
+		}
+
+		private void UpdateBlink(long now)
+		{
+			if (_blinkImage == null || _blinkImage.Source == null) return;
+			if (!IsBlinkableState() || _settings.MotionReduced)
+			{
+				if (_blinking) SetBlinking(false);
+				_blinkAt = 0;
+				_blinkUntil = 0;
+				return;
+			}
+			if (_blinking)
+			{
+				if (now < _blinkUntil) return;
+				SetBlinking(false);
+				_blinkUntil = 0;
+				_blinkAt = now + (long)(1400 + _random.NextDouble() * 2000);
+				return;
+			}
+			if (_blinkAt == 0)
+			{
+				_blinkAt = now + (long)(1400 + _random.NextDouble() * 2000);
+				return;
+			}
+			if (now < _blinkAt) return;
+			SetBlinking(true);
+			_blinkUntil = now + 260;
+		}
+
+		private void SetBlinking(bool blinking)
+		{
+			_blinking = blinking;
+			if (_blinkImage != null) _blinkImage.Visibility = blinking ? Visibility.Visible : Visibility.Hidden;
+			if (blinking) UpdateBlinkPosition();
 		}
 
 		private void PositionBubble()
@@ -1090,6 +1176,7 @@ namespace BlobbyDesktop
 			SetRenderedState(rendered, now);
 			SetPetVisibility(true);
 			SetBubbleVisibility(_state.IsSpeaking(_model, now) && !_state.Dragging && !_airborne && !_state.OnTheRun);
+			UpdateBlink(now);
 		}
 
 		private void UpdateRun(long now)
@@ -1558,6 +1645,7 @@ namespace BlobbyDesktop
 				_dragging = true;
 				_state.Dragging = true;
 				_phase = Phase.Dragging;
+				SetBlinking(false);
 				_state.Wake(Now(), _model, true, _settings.MotionReduced);
 				SetRenderedState(_state.RenderState(_model, Now()), Now());
 				SetPetVisibility(true);
@@ -2420,6 +2508,7 @@ namespace BlobbyDesktop
 				status["phase"] = _phase.ToString().ToLowerInvariant();
 				status["state"] = _currentState;
 				status["facing"] = _facing;
+				status["blinking"] = _blinking;
 				status["uptime"] = now;
 				status["ticks"] = _tickCount;
 				status["scale"] = _settings.Scale;

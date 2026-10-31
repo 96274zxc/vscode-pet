@@ -434,6 +434,28 @@ async function renderChatPetDesktopEffect(variant, color, kind) {
 	}
 }
 
+function renderChatPetDesktopBlink(color) {
+	// The windowed blink clips the pupil to 2 display px. Frames are baked, so
+	// provide a tiny transparent overlay that covers each pupil with the body
+	// color and draws the clipped 2px line; the helper shows it for 260ms.
+	const { canvas, context } = createChatPetDesktopCanvas(96, 96)
+	const body = getChatPetBodyColor(color)
+	const eye = getChatPetEyeColor(color)
+	context.fillStyle = body
+	context.fillRect(40, 64, 8, 16)
+	context.fillRect(64, 64, 8, 16)
+	context.fillStyle = eye
+	context.fillRect(40, 70, 8, 4)
+	context.fillRect(64, 70, 8, 4)
+	return {
+		width: 96,
+		height: 96,
+		durations: [0],
+		loop: false,
+		frames: [canvas.toDataURL('image/png')],
+	}
+}
+
 async function renderChatPetDesktopPayload(options) {
 	const { variant, color, accessoryId } = options
 	const plan = getChatPetDesktopFramePlan(variant)
@@ -461,7 +483,8 @@ async function renderChatPetDesktopPayload(options) {
 	}
 	const bubble = await renderChatPetDesktopEffect(variant, color, 'bubble')
 	const respawn = await renderChatPetDesktopEffect(variant, color, 'respawn')
-	return { states, bubble, respawn }
+	const blink = renderChatPetDesktopBlink(color)
+	return { states, bubble, respawn, blink }
 }
 
 /* ---------------------------------------------------------------- bridge */

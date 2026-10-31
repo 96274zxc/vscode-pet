@@ -568,6 +568,7 @@ export class DesktopHelperManager {
 		}
 		const bubble = await effectMeta('bubble', bundle.bubble)
 		const respawn = await effectMeta('respawn', bundle.respawn)
+		const blink = bundle.blink ? await effectMeta('blink', bundle.blink) : undefined
 		const manifest = {
 			protocol: DESKTOP_PROTOCOL,
 			sessionId,
@@ -584,6 +585,7 @@ export class DesktopHelperManager {
 			states,
 			bubble,
 			respawn,
+			...(blink ? { blink } : {}),
 		}
 		const path = join(dir, 'manifest.json')
 		await this.fs.writeFile(path, JSON.stringify(manifest))

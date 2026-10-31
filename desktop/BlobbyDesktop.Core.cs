@@ -440,6 +440,7 @@ namespace BlobbyDesktop
 		public Dictionary<string, DesktopAnimation> States = new Dictionary<string, DesktopAnimation>();
 		public DesktopAnimation Bubble;
 		public DesktopAnimation Respawn;
+		public DesktopAnimation Blink;
 		public int ParentPid;
 		public string SessionDir;
 		public string FramesDir;
@@ -478,6 +479,7 @@ namespace BlobbyDesktop
 			}
 			manifest.Bubble = DesktopAnimation.Load(manifest.FramesDir, "bubble", JsonRead.GetObject(root, "bubble"));
 			manifest.Respawn = DesktopAnimation.Load(manifest.FramesDir, "respawn", JsonRead.GetObject(root, "respawn"));
+			if (root.ContainsKey("blink")) manifest.Blink = DesktopAnimation.Load(manifest.FramesDir, "blink", JsonRead.GetObject(root, "blink"));
 			return manifest;
 		}
 

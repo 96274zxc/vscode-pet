@@ -257,8 +257,9 @@ export function validateDesktopBundle(raw) {
 	if (!states.idle) throw httpError(400, 'desktop bundle needs idle frames')
 	const bubble = normalizeEffect(raw.bubble, 'bubble')
 	const respawn = normalizeEffect(raw.respawn, 'respawn')
+	const blink = isRecord(raw.blink) ? normalizeEffect(raw.blink, 'blink') : undefined
 	if (totalBytes > DESKTOP_MAX_BUNDLE_BYTES) throw httpError(400, 'desktop bundle is too large')
-	return { protocol: DESKTOP_PROTOCOL, frameKey, settings, facts, labels, theme, model, windowRect, states, bubble, respawn }
+	return { protocol: DESKTOP_PROTOCOL, frameKey, settings, facts, labels, theme, model, windowRect, states, bubble, respawn, ...(blink ? { blink } : {}) }
 }
 
 function normalizeEffect(raw, label) {
