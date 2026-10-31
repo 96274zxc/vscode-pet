@@ -492,6 +492,53 @@ namespace BlobbyDesktop
 		}
 	}
 
+	internal sealed class DesktopFrameSet
+	{
+		private readonly string _directory;
+		private readonly BitmapSource[] _frames;
+
+		public DesktopFrameSet(string directory, int count)
+		{
+			_directory = directory ?? "";
+			_frames = new BitmapSource[Math.Max(0, count)];
+		}
+
+		public int Length
+		{
+			get { return _frames.Length; }
+		}
+
+		public int LoadedCount
+		{
+			get
+			{
+				int count = 0;
+				for (int index = 0; index < _frames.Length; index++) if (_frames[index] != null) count++;
+				return count;
+			}
+		}
+
+		public BitmapSource this[int index]
+		{
+			get
+			{
+				if (index < 0 || index >= _frames.Length) return null;
+				BitmapSource frame = _frames[index];
+				if (frame != null) return frame;
+				string path = Path.Combine(_directory, index.ToString(CultureInfo.InvariantCulture) + ".png");
+				BitmapImage image = new BitmapImage();
+				image.BeginInit();
+				image.CacheOption = BitmapCacheOption.OnLoad;
+				image.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
+				image.UriSource = new Uri(path, UriKind.Absolute);
+				image.EndInit();
+				image.Freeze();
+				_frames[index] = image;
+				return image;
+			}
+		}
+	}
+
 	internal sealed class DesktopAnimation
 	{
 		public string Name;
@@ -501,8 +548,8 @@ namespace BlobbyDesktop
 		public int[] FrameIndices = new int[0];
 		public bool Loop;
 		public bool Mirror = true;
-		public BitmapSource[] Right = new BitmapSource[0];
-		public BitmapSource[] Left;
+		public DesktopFrameSet Right = new DesktopFrameSet("", 0);
+		public DesktopFrameSet Left;
 
 		public bool Static
 		{
@@ -511,21 +558,12 @@ namespace BlobbyDesktop
 
 		public int SourceFrameCount
 		{
-			get { return Right.Length == 0 ? 1 : Right.Length; }
+			get { return Right == null || Right.Length == 0 ? 1 : Right.Length; }
 		}
 
 		public int LoadedFrameCount()
 		{
-			int count = 0;
-			if (Right != null)
-			{
-				for (int index = 0; index < Right.Length; index++) if (Right[index] != null) count++;
-			}
-			if (Left != null)
-			{
-				for (int index = 0; index < Left.Length; index++) if (Left[index] != null) count++;
-			}
-			return count;
+			return (Right == null ? 0 : Right.LoadedCount) + (Left == null ? 0 : Left.LoadedCount);
 		}
 
 		public int TotalFrameCount()
@@ -561,7 +599,7 @@ namespace BlobbyDesktop
 			foreach (object value in durations) values.Add(JsonRead.Number(value, 0));
 			animation.Durations = values.ToArray();
 			int count = Math.Max(1, JsonRead.GetInt(meta, "count", animation.Durations.Length));
-			animation.Right = LoadFrames(Path.Combine(framesDir, name), count);
+			animation.Right = new DesktopFrameSet(Path.Combine(framesDir, name), count);
 			object[] frameIndices = JsonRead.AsArray(meta.ContainsKey("frameIndices") ? meta["frameIndices"] : null);
 			if (frameIndices != null && frameIndices.Length > 0)
 			{
@@ -578,27 +616,9 @@ namespace BlobbyDesktop
 			if (!animation.Mirror)
 			{
 				int leftCount = Math.Max(1, JsonRead.GetInt(meta, "leftCount", count));
-				animation.Left = LoadFrames(Path.Combine(framesDir, name + "-left"), leftCount);
+				animation.Left = new DesktopFrameSet(Path.Combine(framesDir, name + "-left"), leftCount);
 			}
 			return animation;
-		}
-
-		private static BitmapSource[] LoadFrames(string directory, int count)
-		{
-			BitmapSource[] frames = new BitmapSource[count];
-			for (int index = 0; index < count; index++)
-			{
-				string path = Path.Combine(directory, index.ToString(CultureInfo.InvariantCulture) + ".png");
-				BitmapImage image = new BitmapImage();
-				image.BeginInit();
-				image.CacheOption = BitmapCacheOption.OnLoad;
-				image.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
-				image.UriSource = new Uri(path, UriKind.Absolute);
-				image.EndInit();
-				image.Freeze();
-				frames[index] = image;
-			}
-			return frames;
 		}
 	}
 
@@ -1107,7 +1127,12 @@ namespace BlobbyDesktop
 				{
 					DesktopManifest manifest = DesktopManifest.Load(manifestPath);
 					Check(failures, "manifest idle frames", manifest.States.ContainsKey("idle") && manifest.States["idle"].Right.Length > 0, "missing idle");
+					DesktopAnimation idleAnimation = manifest.States["idle"];
+					bool clean = idleAnimation.LoadedFrameCount() == 0;
+					BitmapSource firstIdle = idleAnimation.Right[0];
+					Check(failures, "manifest frames load lazily", clean && firstIdle != null && idleAnimation.LoadedFrameCount() == 1, idleAnimation.LoadedFrameCount().ToString(CultureInfo.InvariantCulture));
 					checks.Add("manifest-load");
+					checks.Add("lazy-frames");
 				}
 				catch (Exception error)
 				{
