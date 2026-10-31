@@ -12,6 +12,7 @@ const SOURCES = [
 	'30-color.js',
 	'35-store.js',
 	'40-render.js',
+	'45-desktop.js',
 	'50-widget.js',
 	'55-react.js',
 	'60-jump-game.js',

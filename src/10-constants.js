@@ -219,4 +219,7 @@ const CHAT_PET_DEFAULT_PREFS = {
 	achievementSeen: [],
 	trueNameUnlocked: false,
 	jumpHighScore: 0,
+	desktopDisplay: false,
+	desktopSmartHide: false,
+	desktopHorizontal: null,
 }

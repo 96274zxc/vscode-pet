@@ -452,6 +452,22 @@
 	cursor: default;
 }
 
+.chat-pet-menu-label {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.chat-pet-menu-check {
+	flex: none;
+	margin-left: 8px;
+	font-size: 12px;
+	line-height: 1;
+	color: var(--dsw-alias-label-primary);
+}
+
 .chat-pet-menu-separator {
 	height: 0;
 	margin: 4px 6px;

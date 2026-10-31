@@ -4,7 +4,8 @@
 
 Blobby is the official VS Code chat pet, ported to the DeepSeek Harness Web composer. It uses the
 official sprite sheets, accessories, frame timings, physics and interaction rules from
-`microsoft/vscode`, not a look-alike.
+`microsoft/vscode`, not a look-alike. On Windows it can also step out of the DSH window and live on
+the desktop while DSH is minimized.
 
 ![Blobby state matrix](https://raw.githubusercontent.com/96274zxc/vscode-pet/main/docs/states.png)
 
@@ -31,9 +32,22 @@ Thanks to the VS Code team and the original Blobby authors for the character and
 - Sits on top of the composer and reacts to chat: pointer gaze, typing, thinking, clapping when the
   agent needs input, sleeping after 20 seconds, and the red-button celebration when a turn finishes.
 - Drag it, flick it, throw it with `Shift+←/→`, hop with `←/→`, catch it while it falls, and watch
-  the despawn/respawn portal sequence. The composer card is its only perch: it spawns and respawns
-  above that card, follows it when the window or input grows/shrinks, bounces off the side walls,
-  and its respawn drop is capped above the composer instead of falling from the top of the chat.
+  the despawn/respawn portal sequence. While the DSH window is visible the composer card is its only
+  perch: it spawns and respawns above that card, follows it when the window or input grows/shrinks,
+  bounces off the side walls, and its respawn drop is capped above the composer instead of falling
+  from the top of the chat. On the desktop the taskbar (or the screen bottom while the taskbar is
+  auto-hidden) is the floor.
+- **Desktop display (Windows desktop app only)**: the pet's context menu gains a checkable
+  **Show on Desktop** item, with **Smart Hide** directly below it once enabled. When DSH is
+  minimized, Blobby moves to the desktop through the official respawn portal and lands above the
+  taskbar at the bottom-right; when DSH comes back, it plays the portal/fall return inside the
+  window. Double-click the desktop pet to bring the DSH window back. The desktop right-click menu
+  mirrors the DSH menu: Hats, Change Color and Play Jump Game restore DSH and open the existing
+  panels/game, while Go on the Run, size controls, Show on Desktop and Smart Hide work on the
+  desktop itself. Throws always land on the taskbar/screen floor and never trigger a fall respawn.
+  **Smart Hide** keeps the pet on the desktop only instead of above other applications. The native
+  helper exits with DSH; on non-Windows the menu items are absent and the host refuses to start the
+  helper, and the plain Web GUI hides the items as well.
 - Right-click for **Hats**, **Play Jump Game**, **Go on the Run / Come Back**, inline
   **− Shrink / Grow +** and **Reset Size** controls, and **Change Color**.
 - 13 hats from the official catalog plus the **Color Customization** custom-color entry, laid out with the
@@ -90,7 +104,10 @@ node --test test/*.test.mjs
 
 `client.js` is generated. Edit files under `src/` and rebuild; do not edit `client.js` directly.
 Assets are embedded as PNG data URLs so the plugin works under both `http://` and the desktop
-`dsh-app://` scheme without cross-origin canvas issues.
+`dsh-app://` scheme without cross-origin canvas issues. The test suite also compiles and runs the
+Windows desktop helper's deterministic self-test (`desktop/blobby-desktop.ps1 -SelfTest`); the
+helper is a local PowerShell/.NET WPF process that the host half starts only in the Windows desktop
+app.
 
 ## Controls
 
@@ -104,6 +121,20 @@ Assets are embedded as PNG data URLs so the plugin works under both `http://` an
 | Bounce while falling / Enter / Space | Bounce |
 | `/blobby` | Unlock Color Customization and open the color tab |
 | `/vscode-pet` | Show/hide Blobby (keeps the plugin installed) |
+| Right-click → **Show on Desktop** | Windows desktop app only: move Blobby to the desktop while DSH is minimized (✓ when enabled) |
+| Right-click → **Smart Hide** | Windows desktop app only: show the desktop pet on the desktop only, never above other apps |
+| Double-click the desktop pet | Bring the DSH window back |
+
+## Compatibility
+
+- Target: DSH `>=0.2.1-rc.1` Web and Desktop profiles.
+- The desktop display is Windows desktop only. It uses `connection`-authenticated host routes on the
+  loopback server plus a local PowerShell/.NET WPF helper; the plain Web GUI hides the menu items and
+  non-Windows hosts return `501` for desktop-start requests. No DSH source is modified and no model
+  tools or routes outside `/api/blobby/desktop/*` are added.
+- Preferences, hats, colors and the jump-game high score stay in
+  `localStorage['dsh.vscode-pet.prefs.v1']` on the local device. Desktop frames and settings are
+  generated on the client; the helper only receives PNG frames, labels and local geometry.
 
 ## Source and license
 
@@ -124,4 +155,11 @@ It was then verified in the real Electron desktop profile (not headless): compos
 default spawn, maximize/restore repositioning, rotated wall bounces, capped respawn, and resizing
 while the pet is airborne. The fall and respawn paths were also compared frame by frame against
 VS Code 1.144's Blobby on the same machine.
+
+Desktop display was verified in the same Windows Electron profile: the trailing check mark and the
+conditional Smart Hide item, the portal/respawn handoff when minimizing and restoring, landing on
+the taskbar, throwing without a fall respawn, Smart Hide against a foreground app, double-click
+restore, the desktop Hats command opening the existing panel, and the helper exiting when DSH's
+host closes its stdin. The helper's geometry, physics and state-machine self-test runs in the test
+suite.
 

@@ -68,6 +68,8 @@ class ChatPetController {
 		this._throw = undefined
 		this._hopDirection = 'right'
 		this._uiOpen = false
+		this._desktopSuspended = false
+		this._desktopTransition = false
 		this._lastFacing = 'right'
 		this._customPosition = false
 		this._horizontalAnchor = undefined
@@ -281,6 +283,7 @@ class ChatPetController {
 
 	layout(preserveTop = false) {
 		if (this.disposed) return
+		if (this._desktopSuspended) return
 		if (!this.visible) {
 			this.root.style.display = 'none'
 			return
@@ -413,6 +416,7 @@ class ChatPetController {
 		this.pending = facts.pendingInteraction === true
 		this.hasInput = facts.hasInput === true
 		if (nextInputRevision !== undefined) this._lastInputRevision = nextInputRevision
+		if (this._desktopSuspended) return
 		if (this.pending && !wasPending) {
 			this.confirmationExpired = false
 			this._scheduleConfirmation()
@@ -447,7 +451,7 @@ class ChatPetController {
 	}
 
 	recompute(restart = false) {
-		if (this.disposed || !this.visible) return
+		if (this.disposed || !this.visible || this._desktopSuspended || this._desktopTransition) return
 		if (this.onTheRun) {
 			this._renderState('onTheRun', restart)
 			this.button.classList.add('on-the-run')
@@ -1200,6 +1204,11 @@ class ChatPetController {
 		this._renderState('splat')
 		setTimeout(() => {
 			if (this.dead || this.disposed) return
+			if (this._desktopTransition) {
+				this._desktopTransition = false
+				this.recompute(true)
+				return
+			}
 			this._renderState('idle')
 			this._resetIdle()
 		}, SPLAT_STATE_DURATION)
@@ -1409,6 +1418,118 @@ class ChatPetController {
 		}
 	}
 
+	/* --------------------------------------------------- desktop handoff */
+
+	suspendForDesktop() {
+		if (this.disposed || this._desktopSuspended) return
+		this._desktopSuspended = true
+		this._desktopTransition = false
+		this.clearTransient()
+		this._clearIdle()
+		this._blink.cancel()
+		this._hop.cancel()
+		if (this._throw || this.airborne) {
+			this.airborne = false
+			this._throw = undefined
+			this.button.classList.remove('throwing', 'falling')
+			this.button.style.transform = ''
+		}
+		this.dragging = false
+		this.dead = false
+		this._respawnPhase = 'none'
+		this._deathPosition = undefined
+		this._respawnPosition = undefined
+		this.respawnContainer.classList.add('hidden')
+		this.button.classList.remove('hidden', 'dragging', 'resisting', 'soft-resisting')
+		clearTimeout(this.frameTimer)
+		this.frameTimer = undefined
+		clearTimeout(this.transientTimer)
+		this.transientTimer = undefined
+		clearTimeout(this.respawnTimer)
+		this.respawnTimer = undefined
+		clearTimeout(this.bounceTimer)
+		this.bounceTimer = undefined
+		this._resetBounceCount()
+		this.root.style.display = 'none'
+		this.button.tabIndex = -1
+	}
+
+	cancelDesktopSuspend() {
+		if (!this._desktopSuspended) return
+		this._desktopSuspended = false
+		this._desktopTransition = false
+		if (!this.visible || this.prefs?.visible === false) {
+			this.setVisible(false)
+			return
+		}
+		this.root.style.display = ''
+		this.button.tabIndex = 0
+		this.layout()
+		this.recompute(true)
+		this._resetIdle()
+	}
+
+	resumeFromDesktop() {
+		if (this._desktopSuspended) {
+			this._desktopSuspended = false
+			this._desktopTransition = false
+		}
+		if (!this.visible || this.prefs?.visible === false) {
+			this.setVisible(false)
+			return
+		}
+		this.root.style.display = ''
+		this.button.tabIndex = 0
+		this.layout()
+		this.recompute(true)
+		this._resetIdle()
+	}
+
+	playDesktopReturn() {
+		if (this.disposed) return
+		if (!this._desktopSuspended) {
+			this.resumeFromDesktop()
+			return
+		}
+		this._desktopSuspended = false
+		if (this.prefs?.visible === false || !this.visible) {
+			this._desktopTransition = false
+			this.setVisible(false)
+			return
+		}
+		this.root.style.display = ''
+		this.button.tabIndex = 0
+		this.layout()
+		if (this.onTheRun) {
+			this._desktopTransition = false
+			this.recompute(true)
+			return
+		}
+		const bounds = this._bounds()
+		if (!bounds) {
+			this._desktopTransition = false
+			this.recompute(true)
+			return
+		}
+		this._preload()
+		const minimumLeft = bounds.inputLeft
+		const maximumLeft = Math.max(minimumLeft, bounds.inputRight - this.displaySize)
+		const left = this._customPosition && this._horizontalAnchor
+			? getChatPetAnchoredHorizontalPosition(this._horizontalAnchor, minimumLeft, maximumLeft)
+			: getChatPetDefaultHorizontalPosition(minimumLeft, maximumLeft)
+		this._left = left
+		this._top = this._restingTop()
+		setButtonPosition(this.button, this._left, this._top)
+		this.dead = true
+		this._respawnPhase = 'respawning'
+		this._deathPosition = undefined
+		this._respawnPosition = [left, getChatPetRespawnTop(this.chatRect.top, this.inputRect.top)]
+		this._desktopTransition = true
+		this.button.classList.add('hidden')
+		this.button.tabIndex = -1
+		this._showRespawnSequence()
+	}
+
 	/* ------------------------------------------------------------- on run */
 
 	setOnTheRun(value) {
@@ -1459,6 +1580,7 @@ class ChatPetController {
 		const accessoryChanged = this.accessoryId !== prefs.accessory
 		this.accessoryId = prefs.accessory
 		this.onTheRun = prefs.onTheRun
+		if (this._desktopSuspended) return
 		if (prefs.visible === false) {
 			this.setVisible(false)
 			return
@@ -1543,6 +1665,7 @@ class ChatPetController {
 	/* ------------------------------------------------------------- cleanup */
 
 	_onVisibilityChange() {
+		if (this._desktopSuspended) return
 		if (document.hidden) {
 			clearTimeout(this.frameTimer)
 			this.frameTimer = undefined

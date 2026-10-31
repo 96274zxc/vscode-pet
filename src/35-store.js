@@ -21,6 +21,12 @@ function normalizeChatPetPrefs(raw) {
 		const inset = Number.isFinite(source.horizontal.inset) ? Math.max(0, source.horizontal.inset) : CHAT_PET_DEFAULT_RIGHT_INSET
 		horizontal = { edge, inset }
 	}
+	let desktopHorizontal = null
+	if (source.desktopHorizontal && typeof source.desktopHorizontal === 'object') {
+		const edge = source.desktopHorizontal.edge === 'left' ? 'left' : 'right'
+		const inset = Number.isFinite(source.desktopHorizontal.inset) ? Math.max(0, source.desktopHorizontal.inset) : CHAT_PET_DEFAULT_RIGHT_INSET
+		desktopHorizontal = { edge, inset }
+	}
 	const achievementSeen = Array.isArray(source.achievementSeen)
 		? source.achievementSeen.filter(id => CHAT_PET_ACHIEVEMENTS.some(achievement => achievement.id === id))
 		: []
@@ -32,6 +38,9 @@ function normalizeChatPetPrefs(raw) {
 		accessory,
 		scale,
 		horizontal,
+		desktopHorizontal,
+		desktopDisplay: source.desktopDisplay === true,
+		desktopSmartHide: source.desktopSmartHide === true,
 		onTheRun: source.onTheRun === true,
 		achievementSeen: [...new Set(achievementSeen)],
 		trueNameUnlocked: source.trueNameUnlocked === true,

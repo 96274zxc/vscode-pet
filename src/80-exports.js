@@ -20,7 +20,11 @@ function installChatPetDebugApi() {
 		openPanel: tab => activeBlobbyController?.host.openPanel(tab),
 		unlockTrueName: () => activeBlobbyController?.unlockTrueName(),
 		startJumpGame: () => activeBlobbyController?.startJumpGame(),
+		startDesktop: () => activeChatPetDesktopBridge?.start(),
+		stopDesktop: () => activeChatPetDesktopBridge?.stop(),
+		getDesktop: () => activeChatPetDesktopBridge?.getSnapshot(),
 		get controller() { return activeBlobbyController },
+		get desktop() { return activeChatPetDesktopBridge },
 	}
 }
 
@@ -140,4 +144,14 @@ const __test = {
 	ChatPetJumpGameModel,
 	ChatPetHopController,
 	ChatPetDirectionChangeController,
+	CHAT_PET_DESKTOP_PROTOCOL,
+	isChatPetDesktopPlatform,
+	isChatPetDesktopSupported,
+	getChatPetDesktopGeometry,
+	getChatPetDesktopAnchoredLeft,
+	getChatPetDesktopHorizontalAnchor,
+	getChatPetDesktopFramePlan,
+	getChatPetDesktopModel,
+	getChatPetDesktopMenuLabels,
+	renderChatPetDesktopPayload,
 }

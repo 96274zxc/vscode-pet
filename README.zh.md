@@ -3,7 +3,8 @@
 [English](README.md) | **简体中文**
 
 Blobby 是 VS Code 官方聊天宠物（chat pet）在 DeepSeek Harness Web 输入框上方的非官方移植版。
-它直接使用官方的雪碧图、配件图集、帧时序、物理参数和交互规则，不是仿制形象。
+它直接使用官方的雪碧图、配件图集、帧时序、物理参数和交互规则，不是仿制形象。在 Windows
+桌面端，DSH 窗口最小化时它还可以走到桌面上活动。
 
 ![Blobby 状态矩阵](https://raw.githubusercontent.com/96274zxc/vscode-pet/main/docs/states.png)
 
@@ -31,9 +32,16 @@ thinking 气泡。主图为 144×144（插件卡片 36px 的 4 倍），`icons/i
 - **聊天反应**：目光跟随鼠标、输入时打字、等待回复时思考、需要确认时鼓掌、空闲 20 秒后睡觉、
   回合结束时按红色按钮庆祝。
 - **移动与物理**：拖拽、flick、`Shift+←/→` 投掷、`←/→` 连续跳跃、下落时用指针/Enter/空格接住弹跳，
-  以及掉出输入框后的传送门消失/重生。宠物只把输入卡片上沿当作落脚点；窗口或输入框尺寸变化时
-  会自动贴回卡片上沿；撞到左右边缘会短暂停顿、旋转并反弹；重生从输入框上方的限高位置落下。
-  因此默认出生点、落脚点和重生点都与输入栏一致，而不是聊天区顶部或右侧空白处。
+  以及掉出输入框后的传送门消失/重生。DSH 窗口可见时宠物只把输入卡片上沿当作落脚点；窗口或输入框
+  尺寸变化时会自动贴回卡片上沿；撞到左右边缘会短暂停顿、旋转并反弹；重生从输入框上方的限高位置
+  落下。桌面显示时则以任务栏（任务栏自动隐藏时为屏幕底部）为地面。
+- **桌面显示（仅 Windows 桌面端）**：右键菜单新增可勾选的**桌面显示**，选中后行尾显示 ✓，其下紧接
+  **智能隐藏**。DSH 窗口最小化时，Blobby 通过官方的重生传送门切换到桌面，在右下角任务栏上方落下；
+  窗口恢复时在窗口内播放传送门/下落回归。双击桌面 Blobby 可唤起 DSH 窗口。桌面右键菜单与窗口内一致：
+  帽子、颜色、跳跳乐会恢复 DSH 并打开现有面板/游戏；跑路/回来、大小、桌面显示、智能隐藏则在桌面层
+  生效。桌面投掷永远落在任务栏/屏幕底部，不会触发坠落重生。开启**智能隐藏**后，Blobby 只显示在桌面，
+  不置顶在其他应用前。原生 helper 随 DSH 退出；非 Windows 环境下不显示这些菜单项，Host 也拒绝
+  启动桌面显示；Web 版同样隐藏这些菜单项。
 - **右键菜单**：帽子、跳跳乐、跑路/回来、`− 缩小 / 放大 +` 与“恢复大小”两行大小控制、颜色。
 - **帽子**：官方 13 顶帽子，加上“颜色自定义”项，并带上 DSH 专属的“不戴帽子”选项，组成
   3 列共 15 个 card、五行。计数沿用 VS Code 原版的“14 of 14 unlocked”说法，只统计 13 顶帽子和
@@ -89,6 +97,9 @@ $profile = "$env:USERPROFILE\.dsh\profiles\desktop"
 | 下落时指针接触 / Enter / 空格 | 弹跳 |
 | `/blobby` | 解锁颜色自定义并打开颜色页 |
 | `/vscode-pet` | 显示/隐藏 Blobby（插件保持启用） |
+| 右键 → **桌面显示** | 仅 Windows 桌面端：DSH 最小化时把 Blobby 放到桌面（启用后显示 ✓） |
+| 右键 → **智能隐藏** | 仅 Windows 桌面端：桌面 Blobby 只显示在桌面，不置顶在其他应用前 |
+| 双击桌面上的 Blobby | 唤起 DSH 窗口 |
 
 拖拽到非初始位置后，单击播放随机动画会**留在当前位置**；朝左的宽精灵（typing、buttonPress 等）
 也会正确对齐帽子、身体和眼睛。
@@ -103,12 +114,18 @@ node --test test/*.test.mjs
 
 `client.js` 是构建产物；请修改 `src/` 后重新构建，不要直接编辑 `client.js`。所有 PNG 素材以
 data URL 内嵌，避免 desktop 的 `dsh-app://` 与 HTTP 之间的跨 origin / canvas taint 问题。
+测试套件还会编译并运行 Windows 桌面 helper 的确定性自测（`desktop/blobby-desktop.ps1 -SelfTest`）；
+helper 是由 Host 半在 Windows 桌面端启动的本地 PowerShell/.NET WPF 进程。
 
 ## 兼容性
 
 - 目标：DSH `>=0.2.1-rc.1` 的 Web / Desktop profile。
-- 仅使用客户端插件 API：`conversation.input.dock`、`locale`、`commandUi`；不注册 Host 路由或模型工具。
-- 不修改 DSH 源码，不修改其他插件。
+- 窗口内功能只用客户端插件 API：`conversation.input.dock`、`locale`、`commandUi`；桌面显示额外使用
+  Host 的 `connection` 鉴权路由 `/api/blobby/desktop/*` 和本地 helper 进程，不注册模型工具。
+- 桌面显示仅支持 Windows 桌面应用；Web 版隐藏菜单项。非 Windows 环境下菜单项不显示，Host 也拒绝
+  启动（返回 501）。
+- 不修改 DSH 源码，不修改其他插件。helper 只接收本地生成的 PNG 帧、菜单文案和屏幕几何信息，
+  不访问网络。
 - 设置保存在浏览器 `localStorage['dsh.vscode-pet.prefs.v1']`，属于本地设备，不跟随账号跨设备同步。
 
 ## 许可证
@@ -125,5 +142,10 @@ data URL 内嵌，避免 desktop 的 `dsh-app://` 与 HTTP 之间的跨 origin /
 另外在 Electron desktop profile（真实窗口，非 headless）中逐项验证了输入卡片落点、默认出生位置、
 窗口最大化/还原时的自动回位、撞左右边缘的旋转反弹、限高重生和投掷中的窗口缩放；并与本机
 VS Code 1.144 的 Blobby 逐帧对比了落下与重生轨迹。
+
+桌面显示也在同一个 Windows Electron profile 中验证：行尾 ✓ 与条件显示的智能隐藏项、最小化/恢复时的
+传送门交接、任务栏落点、投掷不坠落重生、智能隐藏对前台应用的隐藏/恢复、双击唤起窗口、桌面菜单的
+帽子命令打开现有面板，以及 DSH 关闭 stdin 后 helper 自动退出。helper 的几何、物理和状态机自测
+包含在测试套件中。
 
 `docs/states.png` 是状态矩阵，`docs/hats.png` 与 `docs/color.png` 是自定义面板截图。

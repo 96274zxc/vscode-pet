@@ -1,10 +1,12 @@
 /**
  * Host half of the Blobby bundle.
  *
- * Everything the pet needs lives in the browser module. This half only exists
- * so the package is a valid Loader entry and so the client module graph can be
- * composed for the `vscode-pet` package.
+ * The pet itself lives in the browser module. This half only owns the optional
+ * Windows desktop display routes and their native helper process; every other
+ * environment leaves it idle.
  */
-export function apply() {
-	/* no host state, routes, or tools */
+import { registerBlobbyDesktop } from './desktop/host.js'
+
+export function apply(ctx) {
+	registerBlobbyDesktop(ctx)
 }

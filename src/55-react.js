@@ -78,9 +78,10 @@ function ChatPetPreview(props) {
 }
 
 function ChatPetMenu(props) {
-	const { menu, controller, onClose } = props
+	const { menu, controller, onClose, desktopBridge, desktopSupport } = props
 	const ref = React.useRef(null)
 	const [position, setPosition] = React.useState(null)
+	const prefs = useBlobbyPrefs()
 	const t = controller?._tr?.bind(controller) ?? (key => getChatPetFallbackDictionary()[key] ?? key)
 	React.useLayoutEffect(() => {
 		if (!menu) return
@@ -142,13 +143,18 @@ function ChatPetMenu(props) {
 		}
 	}, [menu, onClose])
 	if (!menu || !controller) return null
-	const item = (key, label, enabled, onClick) => h('button', {
+	const item = (key, label, enabled, onClick, options = {}) => h('button', {
 		key,
 		type: 'button',
 		className: 'chat-pet-menu-item',
+		role: options.checkable ? 'menuitemcheckbox' : undefined,
+		'aria-checked': options.checkable ? (options.checked === true ? 'true' : 'false') : undefined,
 		disabled: enabled === false,
 		onClick: () => { onClose(); onClick() },
-	}, label)
+	}, [
+		h('span', { key: 'label', className: 'chat-pet-menu-label' }, label),
+		options.checkable ? h('span', { key: 'check', className: 'chat-pet-menu-check', 'aria-hidden': 'true' }, options.checked ? '\u2713' : '') : null,
+	])
 	const jumpEnabled = !controller.dead && !controller.airborne && !controller.onTheRun
 	const sizeControl = h('div', { key: 'size', className: 'chat-pet-menu-size' }, [
 		h('div', { key: 'steps', className: 'chat-pet-menu-size-row' }, [
@@ -180,6 +186,12 @@ function ChatPetMenu(props) {
 			onClick: () => controller.resetSize(),
 		}, t('menu.resetSize')),
 	])
+	const desktopEnabled = prefs.desktopDisplay === true
+	const desktopItems = desktopSupport && desktopBridge ? [
+		h('div', { key: 'sepDesk', className: 'chat-pet-menu-separator' }),
+		item('desktopDisplay', t('menu.desktopDisplay'), true, () => desktopBridge.toggleDisplay(), { checkable: true, checked: desktopEnabled }),
+		desktopEnabled ? item('desktopSmartHide', t('menu.smartHide'), true, () => desktopBridge.toggleSmartHide(), { checkable: true, checked: prefs.desktopSmartHide === true }) : null,
+	] : []
 	return h('div', {
 		ref,
 		className: 'chat-pet-menu',
@@ -194,6 +206,7 @@ function ChatPetMenu(props) {
 		sizeControl,
 		h('div', { key: 'sep2', className: 'chat-pet-menu-separator' }),
 		item('color', t('menu.changeColor'), true, () => controller.host.openPanel('color')),
+		...desktopItems,
 	])
 }
 
@@ -437,9 +450,11 @@ function PetSlot(props) {
 	tRef.current = props.t
 	const [target, setTarget] = React.useState(null)
 	const [ui, setUi] = React.useState({ menu: null, panel: null, tab: 'hats' })
+	const [desktopSupport, setDesktopSupport] = React.useState(false)
 	const anchorRef = React.useRef(null)
 	const mountRef = React.useRef(null)
 	const controllerRef = React.useRef(null)
+	const desktopBridgeRef = React.useRef(null)
 	const uiRef = React.useRef(ui)
 	uiRef.current = ui
 
@@ -499,7 +514,18 @@ function PetSlot(props) {
 		controllerRef.current = controller
 		activeBlobbyController = controller
 		controller.layout()
+		const desktopBridge = new ChatPetDesktopBridge({
+			controller,
+			host: controller.host,
+			prefs: chatPetPrefs,
+			getT: () => tRef.current,
+			onSupportChange: setDesktopSupport,
+		})
+		desktopBridgeRef.current = desktopBridge
+		desktopBridge.init()
 		return () => {
+			if (desktopBridgeRef.current === desktopBridge) desktopBridgeRef.current = null
+			desktopBridge.dispose()
 			if (activeBlobbyController === controller) activeBlobbyController = null
 			controller.destroy()
 			controllerRef.current = null
@@ -533,6 +559,7 @@ function PetSlot(props) {
 			inputRevision: inputRevisionRef.current,
 			canceled: props.session?.canceled === true,
 		})
+		desktopBridgeRef.current?.updateFacts({ running, pendingInteraction: pending })
 	}, [running, pending, hasInput, draft, props.session?.canceled])
 
 	React.useEffect(() => {
@@ -552,7 +579,7 @@ function PetSlot(props) {
 		target ? createPortal(h('div', { key: 'portal', className: 'dsh-blobby-portal' }, [
 			h('div', { key: 'mount', ref: mountRef, className: 'dsh-blobby-mount' }),
 			h('div', { key: 'status', ref: statusNode, className: 'dsh-blobby-status', role: 'status', 'aria-live': 'polite' }),
-			h(ChatPetMenu, { key: 'menu', menu: ui.menu, controller, onClose }),
+			h(ChatPetMenu, { key: 'menu', menu: ui.menu, controller, onClose, desktopBridge: desktopBridgeRef.current, desktopSupport }),
 			h(ChatPetPanel, { key: 'panel', panel: ui.panel, tab: ui.tab, onClose, onTab, controller }),
 		]), target) : null,
 	])
