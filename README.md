@@ -131,6 +131,16 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   `dshWindow`, `dshIconic`, `dshForeground`, `dshWasIconic` in `status.json` while the client's
   snapshot exposes `starting`, `stopping`, `lastHiddenReason`, so a hide can be attributed to the
   focus return, the window-restored check or a client stop.
+- 1.2.19 desktop-vanish fix: the helper rewrites `status.json` at most every 250ms, but since 1.2.17
+  the host treated the file's `phase` as authoritative. The first facts heartbeat right after a
+  successful `/start` still read the old `prepared` snapshot, so the client believed the helper had
+  hidden itself and stopped it in the same tick — after every minimize/blur Blobby simply
+  disappeared. Each show now carries an increasing `showSeq`, the helper stamps it into
+  `status.json`, and the host only trusts a snapshot that belongs to the current show. The helper
+  also flushes the status file immediately on show/hide transitions (no 250ms wait) and only then
+  acknowledges with `shown`, and `/start` waits for that acknowledgement: a helper that never
+  confirms fails the start with `504` (the client then restores the in-window pet) instead of
+  suspending both halves.
 - The remaining helper footprint is the PowerShell 5.1 + .NET/WPF runtime itself; removing it would
   need a different helper host and is out of scope for the current implementation.
 
@@ -240,6 +250,10 @@ host closes its stdin. After the handoff optimizations it was re-checked for the
 DSH grab cursor captured at runtime (byte-identical icon/hotspot), the drag resistance wobble, the
 thinking bubble while a turn runs, a taskbar that stays clickable under the pet window, and a desktop
 context menu that appears at its final position without a flash.
+The 1.2.19 handoff fix was re-checked against the real helper: the `shown` acknowledgement with a
+fresh `status.json` (`showSeq` matching, phase `starting`), `/facts` right after the start reporting
+`prepared: false` while the helper rested above the taskbar with DSH minimized, and the stop returning
+the helper to a prepared phase that `/facts` reports as `prepared: true` again.
 The helper's geometry, physics and state-machine self-test runs in the test suite.
 
 

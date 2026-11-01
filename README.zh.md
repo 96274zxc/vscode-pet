@@ -105,6 +105,13 @@ thinking 气泡。主图为 144×144（插件卡片 36px 的 4 倍），`icons/i
   `active`（`/pending` 等待也加了上限并重试）；helper 的 `status.json` 报告 `stopReason`、
   `dshWindow`、`dshIconic`、`dshForeground`、`dshWasIconic`，客户端快照暴露 `starting`、
   `stopping`、`lastHiddenReason`，便于把收回归因到回焦、window-restored 还是客户端 stop。
+- 1.2.19 的桌面消失修复：helper 最多每 250ms 才重写一次 `status.json`，而 1.2.17 起 host 把该文件的
+  `phase` 当成权威状态，于是 `/start` 成功后紧接着的第一次 facts 心跳仍读到旧文件里的 `prepared`，
+  客户端据此认为 helper 已经自己隐藏，在同一个 tick 里把它 stop 掉——表现就是每次最小化/失焦后
+  Blobby 直接消失。现在 host 给每次 show 带一个递增的 `showSeq`，helper 把它写进 `status.json`，
+  host 只接受属于当前 show 的快照；helper 在显示/隐藏切换时立即落盘（不再等 250ms），并在写完状态
+  后才回 `shown`；`/start` 也改为等待这个 `shown` 确认，helper 不确认时返回 504 并让客户端恢复窗口内
+  宠物，而不是把两边都挂起。
 - helper 剩余的主要占用来自 PowerShell 5.1 + .NET/WPF 运行时本身；要移除它需要更换 helper 宿主，
   不在当前实现范围内。
 
@@ -204,6 +211,10 @@ VS Code 1.144 的 Blobby 逐帧对比了落下与重生轨迹。
 按焦点切换（Alt+Tab/点击其他窗口）、投掷时合成帧循环、亚像素精确落位（appliedScreenX 与物理位置
 一致，而不是窗口取整后的坐标）、运行时捕获的同一 grab 光标（图标逐字节一致）、拖拽抵抗抖动、会话
 思考气泡同步、任务栏在宠物窗口下方仍可点击，以及桌面右键菜单在最终位置显示而不闪跳。
+
+1.2.19 的传送修复也用真实 helper 重新验证：`shown` 确认时 `status.json` 已刷新（`showSeq` 匹配、
+phase 为 `starting`）、start 后立刻发生的 facts 心跳返回 `prepared: false`、DSH 最小化时 helper
+保持在任务栏上方 resting，以及 stop 后 helper 回到 prepared 且 facts 再次返回 `prepared: true`。
 
 `docs/states.png` 是状态矩阵，`docs/hats.png` 与 `docs/color.png` 是自定义面板截图。
 

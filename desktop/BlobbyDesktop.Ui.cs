@@ -547,6 +547,7 @@ namespace BlobbyDesktop
 		private bool _stopped;
 		private string _stopReason = "";
 		private bool _prepared;
+		private int _showSeq;
 		private bool _disposeOnStop;
 		private double _padX = 80;
 		private double _padTop = 64;
@@ -2413,6 +2414,7 @@ namespace BlobbyDesktop
 			string type = JsonRead.GetString(message, "type", "");
 			if (type == "show")
 			{
+				_showSeq = JsonRead.GetInt(message, "showSeq", _showSeq);
 				ShowPrepared(JsonRead.GetObject(message, "settings"), JsonRead.GetObject(message, "facts"));
 				return;
 			}
@@ -2480,6 +2482,10 @@ namespace BlobbyDesktop
 			StartRendering();
 			ApplyTopmost();
 			LayoutWindow(true);
+			// Flush the status before acknowledging the show: the host waits for
+			// "shown" and then treats status.json as the helper's real phase, so the
+			// file must never still describe the prepared window at that point.
+			WriteStatus(Now(), true);
 			Dictionary<string, object> shown = new Dictionary<string, object>();
 			shown["type"] = "shown";
 			Program.Emit(shown);
@@ -2566,6 +2572,10 @@ namespace BlobbyDesktop
 			_timer.Interval = TimeSpan.FromMilliseconds(150);
 			_timer.Start();
 			if (_stopRestore) Native.RestoreWindow(_dshWindow, _stopFocus);
+			// Make the prepared phase visible to the host immediately; otherwise a
+			// facts heartbeat can still read the previous (running) phase for up to
+			// 250 ms and the client keeps believing the pet is on the desktop.
+			WriteStatus(Now(), true);
 			Dictionary<string, object> payload = new Dictionary<string, object>();
 			payload["type"] = "hidden";
 			payload["settings"] = _settings.ToJson();
@@ -2744,13 +2754,19 @@ namespace BlobbyDesktop
 
 		private void WriteStatus(long now)
 		{
-			if (now - _lastStatusWrite < 250) return;
+			WriteStatus(now, false);
+		}
+
+		private void WriteStatus(long now, bool force)
+		{
+			if (!force && now - _lastStatusWrite < 250) return;
 			_lastStatusWrite = now;
 			if (_stopped || string.IsNullOrEmpty(_manifest.StatusPath)) return;
 			try
 			{
 				Dictionary<string, object> status = new Dictionary<string, object>();
 				status["phase"] = _phase.ToString().ToLowerInvariant();
+				status["showSeq"] = _showSeq;
 				status["state"] = _currentState;
 				status["facing"] = _facing;
 				status["blinking"] = _blinking;

@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -53,17 +53,27 @@ function makeBundle(overrides = {}) {
 }
 
 class FakeChild extends EventEmitter {
-	constructor() {
+	constructor(options = {}) {
 		super()
 		this.stdinLines = []
 		this.stdout = new PassThrough()
 		this.stderr = new PassThrough()
 		this.killed = false
+		this.statusPath = options.statusPath
+		this.holdShow = false
+		this.pendingShow = false
+		this.showSeq = 0
 		this.stdin = {
 			writable: true,
 			write: line => {
 				this.stdinLines.push(line)
-				if (line.includes('"show"')) setImmediate(() => this.stdout.write('{"type":"shown"}\n'))
+				if (line.includes('"show"')) {
+					let message
+					try { message = JSON.parse(line) } catch (ignored) { message = undefined }
+					if (message && Number.isFinite(message.showSeq)) this.showSeq = message.showSeq
+					if (this.holdShow) this.pendingShow = true
+					else this.ackShow()
+				}
 				if (line.includes('"stop"')) {
 					if (line.includes('"dispose":true')) setImmediate(() => this.emit('exit', 0, null))
 					else setImmediate(() => this.stdout.write('{"type":"hidden"}\n'))
@@ -72,6 +82,21 @@ class FakeChild extends EventEmitter {
 			},
 			on: () => {},
 		}
+	}
+	writeStatus(phase, showSeq = this.showSeq) {
+		if (!this.statusPath) return
+		writeFileSync(this.statusPath, JSON.stringify({ phase, showSeq }))
+	}
+	// The real helper flushes status.json before it emits "shown", so the host
+	// never reads the previous phase after the acknowledgement.
+	ackShow() {
+		this.pendingShow = false
+		this.writeStatus('starting')
+		setImmediate(() => this.stdout.write('{"type":"shown"}\n'))
+	}
+	processShow() {
+		this.holdShow = false
+		if (this.pendingShow) this.ackShow()
 	}
 	kill() {
 		this.killed = true
@@ -82,7 +107,12 @@ class FakeChild extends EventEmitter {
 function fakeSpawn(options = {}) {
 	const spawned = []
 	const spawn = (command, args, spawnOptions) => {
-		const child = new FakeChild()
+		let statusPath
+		if (options.status) {
+			try { statusPath = JSON.parse(readFileSync(args[args.length - 2], 'utf8')).statusPath } catch (ignored) { statusPath = undefined }
+		}
+		const child = new FakeChild({ statusPath })
+		if (statusPath) child.writeStatus('prepared', 0)
 		spawned.push({ command, args, options: spawnOptions, child })
 		if (options.ready !== false) setImmediate(() => child.stdout.write('{"type":"ready"}\n'))
 		if (options.autoExit) setImmediate(() => child.emit('exit', 0, null))
@@ -253,6 +283,72 @@ test('facts heartbeat reports the helper prepared state for the active clear', a
 		const started = await manager.start(makeBundle())
 		assert.equal((await manager.facts(started.session, { running: false })).prepared, false)
 		await manager.stop(started.session, { dispose: true })
+	} finally {
+		manager.dispose()
+		await rm(tempRoot, { recursive: true, force: true })
+	}
+})
+
+test('the prepared snapshot of the previous window is not reported after a show', async () => {
+	const tempRoot = await mkdtemp(path.join(tmpdir(), 'blobby-host-test-'))
+	const spawn = fakeSpawn({ status: true })
+	const manager = new DesktopHelperManager({
+		platform: 'win32',
+		helperExists: true,
+		parentPid: 0,
+		tempRoot,
+		spawn,
+		logger: { warn: () => {}, error: () => {} },
+	})
+	try {
+		const prepared = await manager.prepare(makeBundle())
+		const before = await manager.facts(prepared.session, { running: false })
+		assert.equal(before.prepared, true)
+		assert.equal(before.phase, 'prepared')
+
+		// The helper has not handled the queued show yet, so status.json still
+		// describes the prepared window. Reporting that as prepared is what made
+		// the client stop the helper in the same tick it started.
+		const child = spawn.spawned[0].child
+		child.holdShow = true
+		const starting = manager.start(makeBundle())
+		await new Promise(resolve => setTimeout(resolve, 30))
+		const stale = await manager.facts(prepared.session, { running: false })
+		assert.equal(stale.prepared, false)
+		assert.equal(stale.phase, undefined)
+		const stalePending = await manager.pending(prepared.session, 0)
+		assert.equal(stalePending.prepared, false)
+
+		child.processShow()
+		await starting
+		const shown = await manager.facts(prepared.session, { running: false })
+		assert.equal(shown.prepared, false)
+		assert.equal(shown.phase, 'starting')
+
+		// A helper that really hides after the show stamps the current show
+		// sequence, so its fresh prepared snapshot still clears the client.
+		child.writeStatus('prepared')
+		const hidden = await manager.facts(prepared.session, { running: false })
+		assert.equal(hidden.prepared, true)
+		assert.equal(hidden.phase, 'prepared')
+		await manager.stop(prepared.session, { dispose: true })
+	} finally {
+		manager.dispose()
+		await rm(tempRoot, { recursive: true, force: true })
+	}
+})
+
+test('a helper that never confirms the show fails the start instead of hiding the pet', async () => {
+	const { manager, tempRoot, spawn } = await makeManager({ showAckTimeout: 150 })
+	try {
+		await manager.prepare(makeBundle())
+		const child = spawn.spawned[0].child
+		child.holdShow = true
+		await assert.rejects(manager.start(makeBundle()), error => error.status === 504)
+		assert.equal(child.killed, true)
+		assert.equal(manager.session, undefined)
+		await new Promise(resolve => setTimeout(resolve, 20))
+		assert.equal(manager.session, undefined)
 	} finally {
 		manager.dispose()
 		await rm(tempRoot, { recursive: true, force: true })

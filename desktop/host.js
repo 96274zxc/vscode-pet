@@ -24,6 +24,7 @@ const MODULE_DIR = dirname(fileURLToPath(import.meta.url))
 const DEFAULT_HELPER_SCRIPT = join(MODULE_DIR, 'blobby-desktop.ps1')
 const DEFAULT_TEMP_ROOT = join(tmpdir(), 'dsh-blobby-desktop')
 const START_READY_TIMEOUT = 60000
+const SHOW_ACK_TIMEOUT = 8000
 const STOP_TIMEOUT = 12000
 const WARMUP_TIMEOUT = 15000
 const POLL_HOLD = 20000
@@ -73,6 +74,7 @@ export class DesktopHelperManager {
 		this.fs = options.fs ?? nodeFs
 		this.powershell = options.powershell ?? 'powershell.exe'
 		this.parentPid = options.parentPid ?? process.ppid
+		this.showAckTimeout = options.showAckTimeout ?? SHOW_ACK_TIMEOUT
 		this.logger = options.logger ?? { warn: (...args) => console.warn(...args), error: (...args) => console.error(...args) }
 		this.onEvent = options.onEvent
 		this.session = undefined
@@ -177,9 +179,26 @@ export class DesktopHelperManager {
 				current.prepared = false
 				current.visible = true
 				current.version += 1
+				current.showSeq += 1
 				current.lastPollAt = Date.now()
-				this._writeStdin(current, { type: 'show', settings: current.settings, facts: current.facts })
+				// The show sequence number travels with the command and comes back in
+				// status.json, so a snapshot from before this show can never be read
+				// as "the helper went back to prepared" (that made the client stop the
+				// helper in the same tick it started).
+				const written = this._writeStdin(current, { type: 'show', settings: current.settings, facts: current.facts, showSeq: current.showSeq })
+				if (!written) {
+					this._kill(current)
+					await this._cleanupSession(current)
+					throw httpError(500, 'desktop helper stopped accepting commands')
+				}
 				this._wakeWaiters(current)
+				const shown = await this._waitForShown(current)
+				if (!shown) {
+					const stderr = current.stderr.trim()
+					this._kill(current)
+					await this._cleanupSession(current)
+					throw httpError(504, `desktop helper did not confirm the show${stderr ? `: ${stderr}` : ''}`)
+				}
 				return { session: current.id, version: current.version, settings: current.settings, protocol: DESKTOP_PROTOCOL }
 			}
 			await this._disposeCurrent()
@@ -216,6 +235,7 @@ export class DesktopHelperManager {
 			prepared: prepared === true,
 			visible: prepared !== true,
 			version: 0,
+			showSeq: 0,
 			command: undefined,
 			lastPollAt: Date.now(),
 			waiters: [],
@@ -228,6 +248,7 @@ export class DesktopHelperManager {
 			stopping: undefined,
 			hiddenPromise: undefined,
 			resolveHidden: undefined,
+			resolveShown: undefined,
 			exitPromise: undefined,
 			resolveExit: undefined,
 			readyTimer: undefined,
@@ -311,6 +332,9 @@ export class DesktopHelperManager {
 		if (message.type === 'shown') {
 			session.prepared = false
 			session.visible = true
+			const resolveShown = session.resolveShown
+			session.resolveShown = undefined
+			try { resolveShown?.(true) } catch (ignored) { /* isolation */ }
 			return
 		}
 		if (message.type === 'hidden') {
@@ -354,6 +378,9 @@ export class DesktopHelperManager {
 			command: session.command,
 			hiddenReason: session.hiddenReason,
 		}
+		const resolveShown = session.resolveShown
+		session.resolveShown = undefined
+		try { resolveShown?.(false) } catch (ignored) { /* isolation */ }
 		session.resolveExit?.({
 			code,
 			signal,
@@ -381,6 +408,28 @@ export class DesktopHelperManager {
 		}
 	}
 
+	_waitForShown(session) {
+		// The helper acknowledges a show with its "shown" message and flushes
+		// status.json before emitting it. Waiting for that acknowledgement keeps a
+		// start from "succeeding" while the pet never appears, and makes the very
+		// first facts heartbeat read a status that already describes the shown
+		// window instead of the prepared one it just left.
+		if (session.exited) return Promise.resolve(false)
+		return new Promise(resolve => {
+			let settled = false
+			const finish = value => {
+				if (settled) return
+				settled = true
+				clearTimeout(timer)
+				if (session.resolveShown === finish) session.resolveShown = undefined
+				resolve(value === true)
+			}
+			const timer = setTimeout(() => finish(false), this.showAckTimeout)
+			timer.unref?.()
+			session.resolveShown = finish
+		})
+	}
+
 	_requireSession(sessionId) {
 		if (!isDesktopSessionId(sessionId)) throw httpError(400, 'desktop session is invalid')
 		const session = this.session
@@ -388,13 +437,21 @@ export class DesktopHelperManager {
 		return session
 	}
 
-	async _statusPhase(session) {
+	async _statusSnapshot(session) {
 		try {
 			// Use the real fs, not this.fs: the injected fs is the plugin host's
 			// virtual/scoped fs and may not expose the OS temp directory.
 			const raw = await nodeFs.readFile(join(session.dir, 'status.json'), 'utf8')
 			const status = JSON.parse(raw)
-			return typeof status?.phase === 'string' ? status.phase : undefined
+			if (typeof status?.phase !== 'string') return undefined
+			// The helper rewrites status.json at most every 250 ms and only stamps a
+			// show into the file when it handles the show command. A snapshot that
+			// still carries an older show is the prepared window from before the
+			// current show, so it says nothing about the window that is visible now
+			// and must not be reported as "prepared" (the client treats a prepared
+			// answer as "the helper hid itself" and stops it in the same tick).
+			if (session.showSeq > 0 && Number(status.showSeq) !== session.showSeq) return undefined
+			return status
 		} catch (ignored) {
 			return undefined
 		}
@@ -404,13 +461,13 @@ export class DesktopHelperManager {
 		// The helper's status.json is authoritative for prepared/visible: the
 		// message stream can miss/lose a hidden or shown message, and a stale
 		// host-side flag would leave the client active forever.
-		const phase = await this._statusPhase(session)
-		const prepared = phase !== undefined ? phase === 'prepared' : session.prepared === true
+		const status = await this._statusSnapshot(session)
+		const prepared = status ? status.phase === 'prepared' : session.prepared === true
 		return {
 			version: session.version,
 			settings: { ...session.settings, desktopDisplay: session.settings.desktopDisplay !== false },
 			prepared,
-			...(phase ? { phase } : {}),
+			...(status ? { phase: status.phase } : {}),
 			...(session.hiddenReason ? { hiddenReason: session.hiddenReason } : {}),
 		}
 	}
@@ -475,10 +532,11 @@ export class DesktopHelperManager {
 		this._writeStdin(session, { type: 'facts', facts })
 		// The heartbeat carries the prepared flag so the client can clear its
 		// active state even if the hidden renderer's long-poll never delivers.
-		// Read the helper's status.json instead of trusting the host-side flag.
-		const phase = await this._statusPhase(session)
-		const prepared = phase !== undefined ? phase === 'prepared' : session.prepared === true
-		return { ok: true, prepared, ...(phase ? { phase } : {}) }
+		// Read the helper's status.json instead of trusting the host-side flag,
+		// but only accept a snapshot that belongs to the current show.
+		const status = await this._statusSnapshot(session)
+		const prepared = status ? status.phase === 'prepared' : session.prepared === true
+		return { ok: true, prepared, ...(status ? { phase: status.phase } : {}) }
 	}
 
 	_writeStdin(session, value) {
