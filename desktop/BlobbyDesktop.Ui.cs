@@ -212,6 +212,9 @@ namespace BlobbyDesktop
 				if (!IsWindowVisible(hwnd)) return true;
 				string title = TitleOf(hwnd);
 				if (string.IsNullOrEmpty(title)) return true;
+				// The DevTools window belongs to the same Electron process and can be
+				// larger than the app window; never mistake it for the DSH window.
+				if (title.IndexOf("Developer Tools", StringComparison.OrdinalIgnoreCase) >= 0) return true;
 				string className = ClassNameOf(hwnd);
 				bool classMatch = className == "Chrome_WidgetWin_1" || className == "Chrome_WidgetWin_0";
 				bool pidMatch = expectedPid > 0 && ProcessOf(hwnd) == (uint)expectedPid;
@@ -2457,6 +2460,10 @@ namespace BlobbyDesktop
 				_facts.Apply(facts);
 				ApplyFactsVisuals();
 			}
+			// The window-restored check must reflect the DSH state when the pet
+			// actually appears, not whenever the prepared helper happened to start.
+			_dshWindow = Native.FindDshWindow(_parentPid, null);
+			_dshWasIconic = _dshWindow != IntPtr.Zero && Native.IsIconic(_dshWindow);
 			_prepared = false;
 			_disposeOnStop = false;
 			_phase = Phase.Starting;
@@ -2562,6 +2569,7 @@ namespace BlobbyDesktop
 			Dictionary<string, object> payload = new Dictionary<string, object>();
 			payload["type"] = "hidden";
 			payload["settings"] = _settings.ToJson();
+			payload["reason"] = _stopReason;
 			Program.Emit(payload);
 		}
 
@@ -2726,6 +2734,14 @@ namespace BlobbyDesktop
 			_mouseHook = IntPtr.Zero;
 		}
 
+		private static void AccumulateFrameStats(DesktopAnimation animation, ref int loaded, ref int total, ref long bytes)
+		{
+			if (animation == null) return;
+			loaded += animation.LoadedFrameCount();
+			total += animation.TotalFrameCount();
+			bytes += animation.LoadedFrameBytes();
+		}
+
 		private void WriteStatus(long now)
 		{
 			if (now - _lastStatusWrite < 250) return;
@@ -2741,6 +2757,19 @@ namespace BlobbyDesktop
 				status["gaze"] = new object[] { _gazeX, _gazeY };
 				status["bounce"] = _bounceCount;
 				status["confetti"] = _confetti.Count;
+				int loadedFrames = 0;
+				int totalFrames = 0;
+				long frameBytes = 0;
+				foreach (DesktopAnimation animation in _manifest.States.Values) AccumulateFrameStats(animation, ref loadedFrames, ref totalFrames, ref frameBytes);
+				AccumulateFrameStats(_manifest.Bubble, ref loadedFrames, ref totalFrames, ref frameBytes);
+				AccumulateFrameStats(_manifest.Respawn, ref loadedFrames, ref totalFrames, ref frameBytes);
+				AccumulateFrameStats(_manifest.Blink, ref loadedFrames, ref totalFrames, ref frameBytes);
+				AccumulateFrameStats(_manifest.Gaze, ref loadedFrames, ref totalFrames, ref frameBytes);
+				Dictionary<string, object> frames = new Dictionary<string, object>();
+				frames["loaded"] = loadedFrames;
+				frames["total"] = totalFrames;
+				frames["bytes"] = frameBytes;
+				status["frames"] = frames;
 				status["uptime"] = now;
 				status["ticks"] = _tickCount;
 				status["scale"] = _settings.Scale;
@@ -2753,6 +2782,11 @@ namespace BlobbyDesktop
 				status["onTheRun"] = _settings.OnTheRun;
 				status["desktopDisplay"] = _settings.DesktopDisplay;
 				status["menuOpen"] = _menuOpen;
+				status["stopReason"] = _stopReason;
+				status["dshWindow"] = _dshWindow.ToInt64();
+				status["dshIconic"] = _dshWindow != IntPtr.Zero && Native.IsIconic(_dshWindow);
+				status["dshForeground"] = IsDshForeground();
+				status["dshWasIconic"] = _dshWasIconic;
 				if (_menuOpen)
 				{
 					try

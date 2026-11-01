@@ -214,6 +214,11 @@ function HatsPanel(props) {
 	const { controller, onTab, t } = props
 	const prefs = useBlobbyPrefs()
 	const variant = getChatPetColorVariant(prefs.color)
+	React.useEffect(() => () => {
+		const accessoryId = chatPetPrefs.get().accessory
+		const worn = accessoryId ? getChatPetAccessoryById(accessoryId) : undefined
+		releaseChatPetAccessoryImages(worn ? getChatPetAccessoryImageSource(worn).url : undefined)
+	}, [])
 	const hats = CHAT_PET_ACHIEVEMENTS
 		.filter(achievement => achievement.accessory)
 		.map(achievement => getChatPetAccessoryById(achievement.accessory))
@@ -524,6 +529,8 @@ function PetSlot(props) {
 		desktopBridgeRef.current = desktopBridge
 		desktopBridge.init()
 		return () => {
+			clearTimeout(statusTimer.current)
+			statusTimer.current = undefined
 			if (desktopBridgeRef.current === desktopBridge) desktopBridgeRef.current = null
 			desktopBridge.dispose()
 			if (activeBlobbyController === controller) activeBlobbyController = null

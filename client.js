@@ -1212,14 +1212,19 @@ function getChatPetColorPalette(color) {
 
 const coloredSpriteCache = new Map()
 let coloredSpritePixels = 0
-const MAX_CACHED_SPRITE_PIXELS = 2 * 1024 * 1024
+const MAX_CACHED_SPRITE_PIXELS = 1024 * 1024
 
 function getChatPetColoredSprite(image, color) {
 	if (isDefaultChatPetColor(color)) return image
 	const source = image.getAttribute('src')
 	const key = `${source}:${image.naturalWidth}x${image.naturalHeight}:${color}`
 	const cached = coloredSpriteCache.get(key)
-	if (cached) return cached
+	if (cached) {
+		// Refresh the insertion order so the cache behaves as LRU, not FIFO.
+		coloredSpriteCache.delete(key)
+		coloredSpriteCache.set(key, cached)
+		return cached
+	}
 	const canvas = document.createElement('canvas')
 	canvas.width = image.naturalWidth
 	canvas.height = image.naturalHeight
@@ -1787,12 +1792,36 @@ function getChatPetCachedImage(url) {
 	return chatPetLoadedImages.get(url)
 }
 
+function releaseChatPetAccessoryImages(keepUrl) {
+	const sources = new Set()
+	for (const accessory of Object.values(CHAT_PET_ACCESSORIES)) {
+		const source = getChatPetAccessoryImageSource(accessory)
+		if (!source?.url || source.url === keepUrl) continue
+		sources.add(source.url)
+		chatPetLoadedImages.delete(source.url)
+		chatPetImageCache.delete(source.url)
+		chatPetImageFailures.delete(source.url)
+	}
+	if (sources.size === 0) return
+	for (const [key, canvas] of coloredSpriteCache) {
+		let release = false
+		for (const source of sources) {
+			if (key.startsWith(`${source}:`)) { release = true; break }
+		}
+		if (!release) continue
+		coloredSpriteCache.delete(key)
+		coloredSpritePixels -= canvas.width * canvas.height
+	}
+}
+
 /* 45-desktop.js */
 /* Windows desktop display: platform gate, desktop geometry, frame bundles and the client bridge. */
 
 const CHAT_PET_DESKTOP_PROTOCOL = 1
 const CHAT_PET_DESKTOP_ROUTE = '/api/blobby/desktop'
 const CHAT_PET_DESKTOP_START_DEBOUNCE = 250
+const CHAT_PET_DESKTOP_START_TIMEOUT = 15000
+const CHAT_PET_DESKTOP_POLL_TIMEOUT = 5000
 const CHAT_PET_DESKTOP_MENU_LABEL_KEYS = [
 	'menu.hats', 'menu.playJump', 'menu.goOnTheRun', 'menu.comeBack',
 	'menu.grow', 'menu.shrink', 'menu.resetSize', 'menu.changeColor',
@@ -2018,10 +2047,21 @@ function getChatPetDesktopModel() {
 }
 
 function getChatPetDesktopMenuLabels(t) {
+	let revision = 0
+	try { revision = typeof chatPetLocaleRevision === 'number' ? chatPetLocaleRevision : 0 } catch (ignored) { revision = 0 }
+	let lang = ''
+	try { lang = document?.documentElement?.lang ?? '' } catch (ignored) { lang = '' }
+	const key = `${revision}|${lang}`
+	if (chatPetDesktopLabelsCache && chatPetDesktopLabelsKey === key) return chatPetDesktopLabelsCache
 	const labels = {}
-	for (const key of CHAT_PET_DESKTOP_MENU_LABEL_KEYS) labels[key] = translateChatPetText(t, key)
+	for (const labelKey of CHAT_PET_DESKTOP_MENU_LABEL_KEYS) labels[labelKey] = translateChatPetText(t, labelKey)
+	chatPetDesktopLabelsKey = key
+	chatPetDesktopLabelsCache = labels
 	return labels
 }
+
+let chatPetDesktopLabelsCache
+let chatPetDesktopLabelsKey
 
 let chatPetDesktopThemeCanvas
 
@@ -2066,7 +2106,7 @@ function blendDesktopThemeColor(top, bottom) {
 	}
 }
 
-function getChatPetDesktopTheme() {
+function computeChatPetDesktopTheme() {
 	const darkPalette = {
 		dark: true,
 		menuBackground: '#26272b',
@@ -2122,6 +2162,28 @@ function getChatPetDesktopTheme() {
 	}
 }
 
+let chatPetDesktopThemeCache
+let chatPetDesktopThemeCheckedAt = 0
+
+function sameChatPetDesktopTheme(a, b) {
+	return a.dark === b.dark
+		&& a.menuBackground === b.menuBackground
+		&& a.menuText === b.menuText
+		&& a.menuMuted === b.menuMuted
+		&& a.menuHover === b.menuHover
+		&& a.menuBorder === b.menuBorder
+		&& a.accent === b.accent
+}
+
+function getChatPetDesktopTheme() {
+	const now = Date.now()
+	if (chatPetDesktopThemeCache && now - chatPetDesktopThemeCheckedAt < 2000) return chatPetDesktopThemeCache
+	chatPetDesktopThemeCheckedAt = now
+	const next = computeChatPetDesktopTheme()
+	if (!chatPetDesktopThemeCache || !sameChatPetDesktopTheme(chatPetDesktopThemeCache, next)) chatPetDesktopThemeCache = next
+	return chatPetDesktopThemeCache
+}
+
 /* ---------------------------------------------------------------- painter */
 
 function drawChatPetDesktopEyes(context, state, frameIndex, color, eyeState) {
@@ -2162,7 +2224,7 @@ function createChatPetDesktopCanvas(width, height) {
 	return { canvas, context }
 }
 
-function drawChatPetDesktopFrame(context, entry, bodyImage, accessoryImage, accessory, frame, color, facing) {
+function drawChatPetDesktopFrame(context, entry, bodyImage, accessoryImage, accessory, frame, color, facing, scratch) {
 	context.clearRect(0, 0, entry.width, entry.height)
 	drawChatPetComposite(
 		context,
@@ -2181,7 +2243,8 @@ function drawChatPetDesktopFrame(context, entry, bodyImage, accessoryImage, acce
 		color,
 	)
 	if (accessoryImage) {
-		const { canvas: eyeCanvas, context: eyeContext } = createChatPetDesktopCanvas(entry.width, entry.height)
+		const { canvas: eyeCanvas, context: eyeContext } = scratch ?? createChatPetDesktopCanvas(entry.width, entry.height)
+		eyeContext.clearRect(0, 0, entry.width, entry.height)
 		drawChatPetEyeAccessory(eyeContext, accessoryImage, entry.state, frame.index, facing, accessory?.eyeAccessoryMirrorsWithFacing !== false)
 		context.drawImage(eyeCanvas, 0, 0)
 	}
@@ -2192,10 +2255,11 @@ function renderChatPetDesktopStateFrames(entry, bodyImage, accessoryImage, acces
 	const facings = entry.mirror ? ['right'] : ['right', 'left']
 	const rendered = {}
 	for (const facing of facings) {
+		const { canvas, context } = createChatPetDesktopCanvas(entry.width, entry.height)
+		const scratch = accessoryImage ? createChatPetDesktopCanvas(entry.width, entry.height) : undefined
 		const frames = []
 		for (const frame of entry.frames) {
-			const { canvas, context } = createChatPetDesktopCanvas(entry.width, entry.height)
-			drawChatPetDesktopFrame(context, entry, bodyImage, accessoryImage, accessory, frame, color, facing)
+			drawChatPetDesktopFrame(context, entry, bodyImage, accessoryImage, accessory, frame, color, facing, scratch)
 			frames.push(canvas.toDataURL('image/png'))
 		}
 		rendered[facing] = frames
@@ -2208,9 +2272,10 @@ async function renderChatPetDesktopEffect(variant, color, kind) {
 	const source = sources.animated
 	const image = await loadChatPetImage(source.url)
 	const colored = getChatPetColoredSprite(image, color)
+	const { canvas, context } = createChatPetDesktopCanvas(96, 96)
 	const frames = []
 	for (let index = 0; index < source.frameCount; index++) {
-		const { canvas, context } = createChatPetDesktopCanvas(96, 96)
+		context.clearRect(0, 0, 96, 96)
 		context.drawImage(colored, index * 96, 0, 96, 96, 0, 0, 96, 96)
 		frames.push(canvas.toDataURL('image/png'))
 	}
@@ -2253,9 +2318,10 @@ function renderChatPetDesktopGaze(color) {
 	const body = getChatPetBodyColor(color)
 	const eye = getChatPetEyeColor(color)
 	const frames = []
+	const { canvas, context } = createChatPetDesktopCanvas(96, 96)
 	for (let dy = -1; dy <= 1; dy++) {
 		for (let dx = -1; dx <= 1; dx++) {
-			const { canvas, context } = createChatPetDesktopCanvas(96, 96)
+			context.clearRect(0, 0, 96, 96)
 			context.fillStyle = body
 			context.fillRect(36, 60, 16, 24)
 			context.fillRect(60, 60, 16, 24)
@@ -2336,6 +2402,9 @@ class ChatPetDesktopBridge {
 		this._startToken = 0
 		this._warmupRequested = false
 		this._lastSettings = undefined
+		this._lastHiddenReason = undefined
+		this._sentTheme = undefined
+		this._sentLabels = undefined
 		this._startTimer = undefined
 		this._pollAbort = undefined
 		this._frames = undefined
@@ -2375,7 +2444,11 @@ class ChatPetDesktopBridge {
 		if (this.supported && this.prefs.get().desktopDisplay) {
 			this.prewarm()
 			this._startFactsTimer()
-			if (typeof document !== 'undefined' && (document.hidden || document.hasFocus?.() === false)) this._scheduleStart()
+			// Only auto-show when we know the app is minimized. During startup the
+			// renderer can briefly report hasFocus()=false while the DSH window is
+			// actually taking focus; starting then used to show and immediately hide
+			// the helper. The blur handler covers the normal unfocus path.
+			if (typeof document !== 'undefined' && document.hidden) this._scheduleStart()
 		}
 	}
 
@@ -2398,6 +2471,9 @@ class ChatPetDesktopBridge {
 			settings: this._lastSettings,
 			enabled: this.enabled,
 			smartHide: this.smartHide,
+			starting: this._starting,
+			stopping: this._stopping,
+			lastHiddenReason: this._lastHiddenReason,
 		}
 	}
 
@@ -2414,17 +2490,44 @@ class ChatPetDesktopBridge {
 
 	async _request(path, options = {}) {
 		const init = { ...options }
+		delete init.timeout
 		if (init.body !== undefined) {
 			init.headers = { 'content-type': 'application/json', ...(init.headers ?? {}) }
 		}
-		const response = await fetch(`${CHAT_PET_DESKTOP_ROUTE}${path}`, init)
-		if (!response.ok) {
-			const error = new Error(`vscode-pet desktop route ${path} failed: ${response.status}`)
-			error.status = response.status
-			throw error
+		let timer
+		if (Number.isFinite(options.timeout) && typeof AbortController === 'function') {
+			const controller = new AbortController()
+			// Honor a caller-provided signal (e.g. the polling loop's stop
+			// handshake) instead of dropping it when a timeout is also given.
+			const external = options.signal
+			if (external) {
+				if (external.aborted) {
+					try { controller.abort() } catch (ignored) { /* noop */ }
+				} else {
+					try {
+						external.addEventListener?.('abort', () => {
+							try { controller.abort() } catch (ignored) { /* noop */ }
+						}, { once: true })
+					} catch (ignored) { /* noop */ }
+				}
+			}
+			init.signal = controller.signal
+			timer = setTimeout(() => {
+				try { controller.abort() } catch (ignored) { /* noop */ }
+			}, Math.max(1, options.timeout))
 		}
-		const type = response.headers?.get?.('content-type') ?? ''
-		return type.includes('application/json') ? response.json() : response.text()
+		try {
+			const response = await fetch(`${CHAT_PET_DESKTOP_ROUTE}${path}`, init)
+			if (!response.ok) {
+				const error = new Error(`vscode-pet desktop route ${path} failed: ${response.status}`)
+				error.status = response.status
+				throw error
+			}
+			const type = response.headers?.get?.('content-type') ?? ''
+			return type.includes('application/json') ? response.json() : response.text()
+		} finally {
+			clearTimeout(timer)
+		}
 	}
 
 	async prewarm() {
@@ -2489,16 +2592,20 @@ class ChatPetDesktopBridge {
 		const session = this.active ? this.session : this._preparedSession
 		if (!session) return
 		const current = this._getFacts()
+		const themeChanged = current.theme !== this._sentTheme
+		const labelsChanged = current.labels !== this._sentLabels
+		this._sentTheme = current.theme
+		this._sentLabels = current.labels
 		const payload = {
 			running: facts?.running === true,
 			pendingInteraction: facts?.pendingInteraction === true,
 			hasInput: current.hasInput,
 			canceled: current.canceled,
 			inputRevision: current.inputRevision,
-			// The facts timer is also the live theme/label sync: without these
-			// the helper would keep the palette/labels captured at prepare time.
-			theme: current.theme,
-			labels: current.labels,
+			// Theme/labels only when the cached objects changed; the helper keeps
+			// the last values otherwise (the initial bundle/show always carries them).
+			...(themeChanged ? { theme: current.theme } : {}),
+			...(labelsChanged ? { labels: current.labels } : {}),
 		}
 		if (facts?.grabbing === true || current.grabbing) payload.grabbing = true
 		const petRect = facts?.petRect ?? current.petRect
@@ -2506,6 +2613,11 @@ class ChatPetDesktopBridge {
 		this._request('/facts', {
 			method: 'POST',
 			body: JSON.stringify({ session, facts: payload }),
+		}).then(response => {
+			// The facts heartbeat also carries the helper's prepared state so the
+			// active flag can be cleared even when the hidden renderer's long-poll
+			// is throttled/frozen; otherwise _scheduleStart() would refuse forever.
+			if (response?.prepared === true && this.active) this.stop({ returning: true })
 		}).catch(ignored => { /* the next state change retries */ })
 	}
 
@@ -2552,6 +2664,7 @@ class ChatPetDesktopBridge {
 
 	_buildBundle(frames) {
 		const prefs = this.prefs.get()
+		const facts = this._getFacts()
 		return {
 			protocol: CHAT_PET_DESKTOP_PROTOCOL,
 			frameKey: getChatPetDesktopFrameKey(prefs),
@@ -2562,9 +2675,9 @@ class ChatPetDesktopBridge {
 				horizontal: prefs.desktopHorizontal ?? null,
 				motionReduced: this._motionReduced(),
 			},
-			facts: this._getFacts(),
-			labels: getChatPetDesktopMenuLabels(this.getT()),
-			theme: getChatPetDesktopTheme(),
+			facts,
+			labels: facts.labels,
+			theme: facts.theme,
 			model: getChatPetDesktopModel(),
 			windowRect: getChatPetDesktopWindowRect(),
 			states: frames.states,
@@ -2604,19 +2717,22 @@ class ChatPetDesktopBridge {
 		if (options.force !== true && typeof document !== 'undefined' && !document.hidden && document.hasFocus?.() === true) return
 		this._starting = true
 		const token = ++this._startToken
-		this.controller?.suspendForDesktop?.()
 		try {
 			const frames = await this._getFrames()
-			if (this.disposed || token !== this._startToken || !this.enabled) {
-				this.controller?.cancelDesktopSuspend?.()
-				return
-			}
+			if (this.disposed || token !== this._startToken || !this.enabled) return
 			const bundle = this._buildBundle(frames)
-			const response = await this._request('/start', { method: 'POST', body: JSON.stringify({ bundle }) })
+			const response = await this._request('/start', {
+				method: 'POST',
+				body: JSON.stringify({ bundle }),
+				timeout: CHAT_PET_DESKTOP_START_TIMEOUT,
+			})
 			if (this.disposed || token !== this._startToken) {
 				if (response?.session) this._request('/stop', { method: 'POST', body: JSON.stringify({ session: response.session, dispose: true }) }).catch(() => {})
 				return
 			}
+			// Suspend the in-window pet only after the helper actually showed, so a
+			// stalled/failed start can never leave the pet invisible everywhere.
+			this.controller?.suspendForDesktop?.()
 			this.active = true
 			this.session = response?.session
 			this._preparedSession = response?.session
@@ -2625,7 +2741,7 @@ class ChatPetDesktopBridge {
 			this._startPolling()
 			this.updateFacts({ running: this.controller?.running === true, pendingInteraction: this.controller?.pending === true })
 		} catch (error) {
-			this.controller?.cancelDesktopSuspend?.()
+			if (!this.active) this.controller?.cancelDesktopSuspend?.()
 			this.host?.status?.(this._translate('status.desktopError'))
 			console.warn('[vscode-pet] desktop display failed', error)
 		} finally {
@@ -2642,10 +2758,17 @@ class ChatPetDesktopBridge {
 		const loop = async () => {
 			while (!this.disposed && this.active && this.session === session && !(abort?.signal.aborted)) {
 				try {
-					const result = await this._request(`/pending?session=${encodeURIComponent(session)}&since=${this.version}`, abort ? { signal: abort.signal } : {})
+					const result = await this._request(`/pending?session=${encodeURIComponent(session)}&since=${this.version}`, {
+						...(abort ? { signal: abort.signal } : {}),
+						// A bounded wait makes the poll keep retrying even if the
+						// hidden renderer/throttled long-poll stalls, so the prepared
+						// result (and the active clear) is not lost.
+						timeout: CHAT_PET_DESKTOP_POLL_TIMEOUT,
+					})
 					if (abort?.signal.aborted || this.session !== session) return
 					if (result && Number.isFinite(result.version)) this.version = result.version
 					if (result?.settings) this._applyDesktopSettings(result.settings)
+					if (typeof result?.hiddenReason === 'string') this._lastHiddenReason = result.hiddenReason
 					if (result?.prepared === true && this.active) {
 						this.stop({ returning: true })
 						return
@@ -2758,9 +2881,13 @@ class ChatPetDesktopBridge {
 	_onVisibilityChange() {
 		if (this.disposed) return
 		if (typeof document !== 'undefined' && document.hidden) {
-			this._scheduleStart()
+			// Start immediately: a 250ms setTimeout in a hidden renderer can be
+			// throttled or frozen, which used to leave the handoff never started.
+			this._cancelScheduledStart()
+			this.start()
 		} else {
 			this._cancelScheduledStart()
+			if (this._starting) this._startToken += 1
 			if (this.active) this.stop({ returning: true })
 		}
 	}
@@ -2768,12 +2895,18 @@ class ChatPetDesktopBridge {
 	_onWindowFocus() {
 		if (this.disposed) return
 		this._cancelScheduledStart()
+		// A start that is still in flight must not hand off after DSH regained
+		// focus; invalidate it so its response is stopped instead of shown.
+		if (this._starting) this._startToken += 1
 		if (this.active) this.stop({ returning: true })
 	}
 
 	_onWindowBlur() {
 		if (this.disposed || !this.enabled) return
-		this._scheduleStart()
+		// Same as visibilitychange: start in the event itself instead of a timer
+		// that a background window may throttle.
+		this._cancelScheduledStart()
+		this.start()
 	}
 
 	_onPrefsChange() {
@@ -2813,6 +2946,14 @@ class ChatPetDesktopBridge {
 		if (session) this._request('/stop', { method: 'POST', body: JSON.stringify({ session, dispose: true }) }).catch(() => {})
 		this._request('/dispose', { method: 'POST' }).catch(() => {})
 		this.controller?.cancelDesktopSuspend?.()
+		this._frames = undefined
+		this._frameKey = undefined
+		this._framePromise = undefined
+		this._framePromiseKey = undefined
+		this._preparePromise = undefined
+		this._prepareKey = undefined
+		this._preparedSession = undefined
+		this._lastSettings = undefined
 		if (activeChatPetDesktopBridge === this) activeChatPetDesktopBridge = undefined
 	}
 }
@@ -2909,6 +3050,8 @@ class ChatPetController {
 		this._deathPosition = undefined
 		this._respawnPosition = undefined
 		this._jumpGame = undefined
+		this._preloadIdle = undefined
+		this._preloadIsIdle = false
 		this._build()
 		this._bind()
 		this._observeMotion()
@@ -3082,6 +3225,7 @@ class ChatPetController {
 	}
 
 	async _preload() {
+		if (this.disposed) return
 		const sources = getChatPetSpriteSources(this.variant)
 		const urls = new Set()
 		for (const entry of Object.values(sources)) {
@@ -3094,10 +3238,29 @@ class ChatPetController {
 		const respawn = getChatPetRespawnSources(this.variant)
 		urls.add(respawn.animated.url)
 		urls.add(respawn.reducedMotion.url)
-		for (const accessory of Object.values(CHAT_PET_ACCESSORIES)) urls.add(getChatPetAccessoryImageSource(accessory).url)
-		const run = () => { for (const url of urls) loadChatPetImage(url).catch(() => {}) }
-		if (typeof requestIdleCallback === 'function') requestIdleCallback(run, { timeout: 1200 })
-		else setTimeout(run, 50)
+		// Only the worn accessory is prefetched; the hats panel previews load
+		// their own accessory images on demand and release them when closed.
+		const wornAccessory = this.accessoryId ? getChatPetAccessoryById(this.accessoryId) : undefined
+		if (wornAccessory) urls.add(getChatPetAccessoryImageSource(wornAccessory).url)
+		const run = () => {
+			this._preloadIdle = undefined
+			if (this.disposed) return
+			for (const url of urls) loadChatPetImage(url).catch(() => {})
+		}
+		if (typeof requestIdleCallback === 'function') {
+			this._preloadIsIdle = true
+			this._preloadIdle = requestIdleCallback(run, { timeout: 1200 })
+		} else {
+			this._preloadIsIdle = false
+			this._preloadIdle = setTimeout(run, 50)
+		}
+	}
+
+	_cancelPreload() {
+		if (this._preloadIdle === undefined) return
+		if (this._preloadIsIdle && typeof cancelIdleCallback === 'function') cancelIdleCallback(this._preloadIdle)
+		else clearTimeout(this._preloadIdle)
+		this._preloadIdle = undefined
 	}
 
 	/* --------------------------------------------------------------- layout */
@@ -4520,6 +4683,7 @@ class ChatPetController {
 		this._mutationObserver?.disconnect()
 		for (const remove of this._listeners ?? []) remove()
 		if (this._motionQuery?.removeEventListener && this._motionListener) this._motionQuery.removeEventListener('change', this._motionListener)
+		this._cancelPreload()
 		this._jumpGame?.destroy()
 		this.root.remove()
 	}
@@ -4791,6 +4955,11 @@ function HatsPanel(props) {
 	const { controller, onTab, t } = props
 	const prefs = useBlobbyPrefs()
 	const variant = getChatPetColorVariant(prefs.color)
+	React.useEffect(() => () => {
+		const accessoryId = chatPetPrefs.get().accessory
+		const worn = accessoryId ? getChatPetAccessoryById(accessoryId) : undefined
+		releaseChatPetAccessoryImages(worn ? getChatPetAccessoryImageSource(worn).url : undefined)
+	}, [])
 	const hats = CHAT_PET_ACHIEVEMENTS
 		.filter(achievement => achievement.accessory)
 		.map(achievement => getChatPetAccessoryById(achievement.accessory))
@@ -5101,6 +5270,8 @@ function PetSlot(props) {
 		desktopBridgeRef.current = desktopBridge
 		desktopBridge.init()
 		return () => {
+			clearTimeout(statusTimer.current)
+			statusTimer.current = undefined
 			if (desktopBridgeRef.current === desktopBridge) desktopBridgeRef.current = null
 			desktopBridge.dispose()
 			if (activeBlobbyController === controller) activeBlobbyController = null
@@ -5383,6 +5554,20 @@ class ChatPetJumpGameModel {
 		}
 	}
 
+	prune(minimumHeight) {
+		// Platforms/walls this far below the camera can never be seen again, so
+		// they are dropped instead of keeping the array growing for the whole run.
+		// Keep the platform the player stands on (and the wall they stand on) plus
+		// the newest platform, which ensurePlatforms() builds from.
+		if (!Number.isFinite(minimumHeight)) return
+		while (this._platforms.length > 1) {
+			const platform = this._platforms[0]
+			if (platform.height >= minimumHeight || platform.id === this._player.platform) break
+			this._platforms.shift()
+		}
+		this._walls = this._walls.filter(wall => wall.top >= minimumHeight || -wall.id === this._player.platform)
+	}
+
 	step() {
 		const player = this._player
 		this.steps++
@@ -5620,6 +5805,7 @@ class BlobbyJumpGame {
 		if (this.displayedHops !== this.model.hops) this.updateScore()
 		const cameraHeight = Math.max(0, player.height)
 		this.model.ensurePlatforms(player.height + this.anchor + this.model.petSize * 4)
+		this.model.prune(player.height - (this.bounds.height - this.anchor) - this.model.petSize * 2)
 		const visible = new Set()
 		for (const platform of this.model.platforms) {
 			const top = this.anchor + cameraHeight - platform.height + platform.fallDistance
@@ -5731,11 +5917,57 @@ function injectChatPetStyles() {
 	return () => style.remove()
 }
 
+function getChatPetMemorySnapshot() {
+	const controller = activeBlobbyController
+	const bridge = activeChatPetDesktopBridge
+	let heap
+	try {
+		const info = performance?.memory
+		if (info) heap = { used: info.usedJSHeapSize, total: info.totalJSHeapSize, limit: info.jsHeapSizeLimit }
+	} catch (ignored) { /* not chromium */ }
+	let dom = 0
+	try { dom = document.querySelectorAll('[class*="chat-pet-"]').length } catch (ignored) { /* noop */ }
+	let desktop
+	if (bridge) {
+		const snapshot = bridge.getSnapshot()
+		let framesBytes = 0
+		try { framesBytes = bridge._frames ? JSON.stringify(bridge._frames).length : 0 } catch (ignored) { /* noop */ }
+		desktop = { ...snapshot, framesBytes, preparedSession: bridge._preparedSession, frameKey: bridge._frameKey }
+	}
+	let jump
+	if (controller?._jumpGame) {
+		const game = controller._jumpGame
+		jump = { platforms: game.model?.platforms?.length, walls: game.model?.walls?.length, platformElements: game.platformElements?.size, wallElements: game.wallElements?.size }
+	}
+	return {
+		heap,
+		images: { loaded: chatPetLoadedImages.size, pending: chatPetImageCache.size, failed: chatPetImageFailures.size },
+		colored: { count: coloredSpriteCache.size, pixels: coloredSpritePixels },
+		desktop,
+		jump,
+		dom,
+		listeners: controller?._listeners?.length,
+		bridgeListeners: bridge?._listeners?.length,
+		timers: controller ? {
+			idle: Boolean(controller.idleTimer),
+			frame: Boolean(controller.frameTimer),
+			transient: Boolean(controller.transientTimer),
+			confirmation: Boolean(controller.confirmationTimer),
+			bounce: Boolean(controller.bounceTimer),
+			respawn: Boolean(controller.respawnTimer),
+			run: Boolean(controller._runTimer),
+			gazeRaf: controller._gazeRaf !== undefined,
+			preloadIdle: controller._preloadIdle !== undefined,
+		} : undefined,
+		observers: { resize: Boolean(controller?._resizeObserver), mutation: Boolean(controller?._mutationObserver) },
+	}
+}
+
 function installChatPetDebugApi() {
 	let enabled = false
 	try { enabled = new URLSearchParams(location.search).get('blobbyDebug') === '1' || localStorage.getItem(CHAT_PET_DEBUG_KEY) === '1' } catch (ignored) { /* noop */ }
-	if (!enabled) return
-	window.__dshBlobby = {
+	if (!enabled) return undefined
+	const api = {
 		getSnapshot: () => activeBlobbyController?.getSnapshot(),
 		setFacts: facts => activeBlobbyController?.setFacts(facts),
 		showState: state => activeBlobbyController?._showTransientState(state),
@@ -5745,8 +5977,13 @@ function installChatPetDebugApi() {
 		startDesktop: () => activeChatPetDesktopBridge?.start(),
 		stopDesktop: () => activeChatPetDesktopBridge?.stop(),
 		getDesktop: () => activeChatPetDesktopBridge?.getSnapshot(),
+		memory: () => getChatPetMemorySnapshot(),
 		get controller() { return activeBlobbyController },
 		get desktop() { return activeChatPetDesktopBridge },
+	}
+	window.__dshBlobby = api
+	return () => {
+		if (window.__dshBlobby === api) delete window.__dshBlobby
 	}
 }
 
@@ -5873,6 +6110,7 @@ const __test = {
 	getChatPetDesktopAnchoredLeft,
 	getChatPetDesktopHorizontalAnchor,
 	getChatPetDesktopFramePlan,
+	ChatPetDesktopBridge,
 	getChatPetDesktopModel,
 	getChatPetDesktopMenuLabels,
 	renderChatPetDesktopPayload,
