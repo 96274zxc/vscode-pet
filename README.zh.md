@@ -162,6 +162,12 @@ thinking 气泡。主图为 144×144（插件卡片 36px 的 4 倍），`icons/i
   顶边的 `inset()`（`--chat-pet-run-occlude`）并在整个 320ms 回程里保留，两个方向都是身体从输入框
   后面滑进滑出、显示层级始终不变。桌面 helper 原来在静止/跑路/探头姿势之间瞬切，现在用同一条
   ease-out 曲线补间（320ms，减少动态时直接落位），下沉和升起时可见底边始终贴着任务栏。
+- 1.2.27 隐藏到托盘后双击唤回的修复：helper 原来只在*可见*窗口里找 DSH，应用藏进系统托盘后
+  找不到目标，双击宠物就没有反应。现在也会解析隐藏的主窗口（两者都在时优先可见窗口），并且忽略
+  Windows 仍报为前台的那个隐藏窗口，所以 DSH 在托盘里时宠物会留在桌面。双击时通过应用自己的
+  `focusPrimaryWindow()` 回来——这正是托盘右键菜单“打开”用的同一个函数——做法是再启动一次
+  exe，让 Electron 的单实例握手去聚焦它；helper 启动时会清掉 `ELECTRON_RUN_AS_NODE`，否则应用
+  会以静默的 Node 进程启动。窗口从隐藏变可见时也会自动收回宠物。
 - helper 剩余的主要占用来自 PowerShell 5.1 + .NET/WPF 运行时本身；要移除它需要更换 helper 宿主，
   不在当前实现范围内。
 
@@ -300,6 +306,12 @@ phase 为 `starting`）、start 后立刻发生的 facts 心跳返回 `prepared:
 40px，可见底边一直钉在输入卡片顶边；回来时身体从同一条固定线后面逐渐露出来，不再先盖住输入框。桌面
 helper 也用同样的方式单独连拍：宠物在 ~320ms 内沉到任务栏下方再升回来，`status.json` 的 `runOffset`
 从 40 回到 0；helper 自检新增了 `run-motion` 检查覆盖这条曲线。
+
+1.2.27 的托盘修复做了真实环境验证：DSH 隐藏到通知区域后，helper 的 `status.json` 是
+`phase=resting`、能解析到 `dshWindow`、`dshForeground=false`，宠物保持可见，不再被
+“dsh-focused” 误停。真实双击后，同一个 1296×828 窗口回到原位置并位于前台，恢复后的会话界面能
+响应点击切换视图，说明隐藏的 WebContents 已经真正唤醒，而不是只画出一个窗口框。从托盘图标恢复
+DSH 时，宠物也会通过隐藏→可见检查自动收回。
 
 `docs/states.png` 是状态矩阵，`docs/hats.png` 与 `docs/color.png` 是自定义面板截图。
 

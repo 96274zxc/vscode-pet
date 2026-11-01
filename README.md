@@ -213,6 +213,15 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   out behind the input card in both directions with no layer change. The desktop helper used to jump
   between the resting, run and peek poses; it now tweens the same offset with an ease-out curve
   (320ms, reduced motion snaps), keeping the visible bottom on the taskbar edge as it sinks and rises.
+- 1.2.27 tray-hidden double-click restore: the helper only searched *visible* windows for DSH, so
+  after the app was hidden in the system tray it found no target and double-clicking the pet did
+  nothing. It now also resolves the hidden main window (preferring a visible one when both exist) and
+  ignores the hidden window Windows keeps reporting as the foreground, so the pet stays on the
+  desktop while DSH is in the tray. A double-click restores the app through its own
+  `focusPrimaryWindow()` route — the exact function behind the tray menu's Open entry — by starting
+  the executable again and letting Electron's single-instance handshake focus it; the helper clears
+  `ELECTRON_RUN_AS_NODE` for that launch, otherwise the app starts as a silent Node process. A
+  hidden-to-visible transition also dismisses the pet.
 - The remaining helper footprint is the PowerShell 5.1 + .NET/WPF runtime itself; removing it would
   need a different helper host and is out of scope for the current implementation.
 
@@ -366,6 +375,12 @@ composer card's top, and on the way back the body emerges from that same fixed l
 popping over the input. The desktop helper's standalone run was captured the same way: the pet sinks
 below the taskbar edge over ~320ms and rises back through it, with `status.json` reporting
 `runOffset` 40 → 0; the helper self-test covers the motion curve (`run-motion`).
+The 1.2.27 tray fix was verified live. With DSH hidden to the notification area, the helper's
+`status.json` reported `phase=resting`, a resolved `dshWindow` and `dshForeground=false`, and the pet
+stayed visible instead of being dismissed as "dsh-focused". A real double-click brought back the same
+1296×828 window at its previous position and in the foreground, and the restored session UI switched
+views on click, so the hidden WebContents was awake — not just a painted frame. Restoring DSH from the
+tray icon also dismisses the pet through the hidden-to-visible check.
 The helper's geometry, physics and state-machine self-test runs in the test suite.
 
 

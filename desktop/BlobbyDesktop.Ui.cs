@@ -209,10 +209,9 @@ namespace BlobbyDesktop
 		public static IntPtr FindDshWindow(int expectedPid, string titleHint)
 		{
 			IntPtr best = IntPtr.Zero;
-			long bestArea = -1;
+			long bestScore = long.MinValue;
 			EnumWindowsProc callback = delegate(IntPtr hwnd, IntPtr lParam)
 			{
-				if (!IsWindowVisible(hwnd)) return true;
 				string title = TitleOf(hwnd);
 				if (string.IsNullOrEmpty(title)) return true;
 				// The DevTools window belongs to the same Electron process and can be
@@ -226,9 +225,14 @@ namespace BlobbyDesktop
 				RECT rect;
 				if (!GetWindowRect(hwnd, out rect)) return true;
 				long area = (long)(rect.Right - rect.Left) * (long)(rect.Bottom - rect.Top);
-				if (area > bestArea)
+				// The window may be hidden in the system tray, where nothing is
+				// visible. Keep such a hidden main window as a fallback instead of
+				// returning nowhere and leaving the pet unable to restore DSH, but
+				// always prefer a visible window when there is one.
+				long score = area + (IsWindowVisible(hwnd) ? (1L << 50) : 0);
+				if (score > bestScore)
 				{
-					bestArea = area;
+					bestScore = score;
 					best = hwnd;
 				}
 				return true;
@@ -267,20 +271,71 @@ namespace BlobbyDesktop
 			return false;
 		}
 
-		public static void RestoreWindow(IntPtr hwnd, bool focus)
+		public static bool RestoreWindow(IntPtr hwnd, bool focus)
 		{
-			if (hwnd == IntPtr.Zero || !IsWindow(hwnd)) return;
+			if (hwnd == IntPtr.Zero || !IsWindow(hwnd)) return false;
 			try
 			{
-				if (IsIconic(hwnd)) ShowWindow(hwnd, SW_RESTORE);
-				else if (!IsWindowVisible(hwnd)) ShowWindow(hwnd, SW_SHOW);
+				if (IsIconic(hwnd))
+				{
+					ShowWindow(hwnd, SW_RESTORE);
+				}
+				else if (!IsWindowVisible(hwnd))
+				{
+					// Do not fake-show a tray-hidden Electron window: Chromium keeps
+					// its hidden state, so SetWindowPos paints the frame but the page
+					// stops handling input. The app's own show path is required.
+					return false;
+				}
 				if (focus)
 				{
 					if (!SetForegroundWindow(hwnd)) SwitchToThisWindow(hwnd, true);
 				}
+				return IsWindowVisible(hwnd);
 			}
 			catch (Exception)
 			{
+				return false;
+			}
+		}
+
+		// Launching the same executable again takes the app's single-instance
+		// path, which calls its own focusPrimaryWindow(); this is the only reliable
+		// way back from a window hidden in the system tray (the same code path the
+		// tray icon's Open entry uses), and it also wakes the hidden WebContents.
+		public static bool LaunchDsh(int pid)
+		{
+			if (pid <= 0) return false;
+			try
+			{
+				string executable = null;
+				try
+				{
+					using (Process process = Process.GetProcessById(pid))
+					{
+						ProcessModule module = process.MainModule;
+						if (module != null) executable = module.FileName;
+					}
+				}
+				catch (Exception)
+				{
+				}
+				if (string.IsNullOrEmpty(executable) || !File.Exists(executable)) return false;
+				// The helper inherits the desktop host's ELECTRON_RUN_AS_NODE=1
+				// environment. Passing it on makes the launched app run as a Node
+				// process: it hangs silently and never reaches the single-instance
+				// handshake, so the window stays hidden. Start it as a GUI app.
+				ProcessStartInfo info = new ProcessStartInfo(executable);
+				info.UseShellExecute = false;
+				info.WorkingDirectory = System.IO.Path.GetDirectoryName(executable) ?? string.Empty;
+				try { info.EnvironmentVariables.Remove("ELECTRON_RUN_AS_NODE"); } catch (Exception) { }
+				try { info.EnvironmentVariables.Remove("ELECTRON_NO_ATTACH_CONSOLE"); } catch (Exception) { }
+				Process.Start(info);
+				return true;
+			}
+			catch (Exception)
+			{
+				return false;
 			}
 		}
 
@@ -504,6 +559,7 @@ namespace BlobbyDesktop
 		private Native.RECT _monitorPhysical;
 		private IntPtr _dshWindow;
 		private bool _dshWasIconic;
+		private bool _dshWasHidden;
 		private bool _smartHidden;
 		private double _displaySize = 48;
 
@@ -676,6 +732,7 @@ namespace BlobbyDesktop
 		{
 			_dshWindow = Native.FindDshWindow(_parentPid, null);
 			_dshWasIconic = _dshWindow != IntPtr.Zero && Native.IsIconic(_dshWindow);
+			_dshWasHidden = _dshWindow != IntPtr.Zero && !_dshWasIconic && !Native.IsWindowVisible(_dshWindow);
 			IntPtr monitor;
 			if (_dshWindow != IntPtr.Zero)
 			{
@@ -2474,7 +2531,7 @@ namespace BlobbyDesktop
 			if (_phase == Phase.Stopping || _phase == Phase.Prepared || _stopped) return;
 			if (_dshWindow == IntPtr.Zero || !Native.IsWindow(_dshWindow)) return;
 			if (Native.IsIconic(_dshWindow)) return;
-			if (_dshWasIconic && Native.IsWindowVisible(_dshWindow))
+			if ((_dshWasIconic || _dshWasHidden) && Native.IsWindowVisible(_dshWindow))
 			{
 				RequestStop(false, false, false, "window-restored");
 				return;
@@ -2485,10 +2542,41 @@ namespace BlobbyDesktop
 			}
 		}
 
+		private void RestoreDshWindow(bool focus)
+		{
+			if (_dshWindow == IntPtr.Zero || !Native.IsWindow(_dshWindow))
+			{
+				_dshWindow = Native.FindDshWindow(_parentPid, null);
+				_dshWasIconic = _dshWindow != IntPtr.Zero && Native.IsIconic(_dshWindow);
+				_dshWasHidden = _dshWindow != IntPtr.Zero && !_dshWasIconic && !Native.IsWindowVisible(_dshWindow);
+			}
+			// A window hidden in the system tray only comes back through the app's
+			// own focusPrimaryWindow() (the tray menu's Open entry). Launching the
+			// executable again routes there through Electron's single-instance
+			// handshake; faking the native window visible leaves the page deaf.
+			if (_dshWindow != IntPtr.Zero && !Native.IsIconic(_dshWindow) && !Native.IsWindowVisible(_dshWindow))
+			{
+				if (Native.LaunchDsh(_parentPid)) return;
+			}
+			if (Native.RestoreWindow(_dshWindow, focus)) return;
+			if (Native.LaunchDsh(_parentPid)) return;
+			// Last resort when the executable path is unavailable: show the frame
+			// even though the hidden page may need a second click to wake up.
+			if (_dshWindow != IntPtr.Zero && Native.IsWindow(_dshWindow))
+			{
+				Native.SetWindowPos(_dshWindow, IntPtr.Zero, 0, 0, 0, 0, Native.SWP_NOMOVE | Native.SWP_NOSIZE | Native.SWP_NOZORDER | Native.SWP_SHOWWINDOW);
+				if (focus) Native.SetForegroundWindow(_dshWindow);
+			}
+		}
+
 		private bool IsDshForeground()
 		{
 			IntPtr foreground = Native.GetForegroundWindowSafe();
 			if (foreground == IntPtr.Zero) return false;
+			// When the app is hidden in the system tray Windows can keep its hidden
+			// main window as the foreground window. That is not a visible, focused
+			// DSH and must not make the helper think DSH is in front of the pet.
+			if (!Native.IsWindowVisible(foreground)) return false;
 			if (foreground == _dshWindow) return true;
 			if (foreground == _hwnd) return false;
 			uint foregroundPid;
@@ -2625,6 +2713,7 @@ namespace BlobbyDesktop
 			// actually appears, not whenever the prepared helper happened to start.
 			_dshWindow = Native.FindDshWindow(_parentPid, null);
 			_dshWasIconic = _dshWindow != IntPtr.Zero && Native.IsIconic(_dshWindow);
+			_dshWasHidden = _dshWindow != IntPtr.Zero && !_dshWasIconic && !Native.IsWindowVisible(_dshWindow);
 			_prepared = false;
 			_disposeOnStop = false;
 			_phase = Phase.Starting;
@@ -2731,7 +2820,7 @@ namespace BlobbyDesktop
 			StopRendering();
 			_timer.Interval = TimeSpan.FromMilliseconds(150);
 			_timer.Start();
-			if (_stopRestore) Native.RestoreWindow(_dshWindow, _stopFocus);
+			if (_stopRestore) RestoreDshWindow(_stopFocus);
 			// Make the prepared phase visible to the host immediately; otherwise a
 			// facts heartbeat can still read the previous (running) phase for up to
 			// 250 ms and the client keeps believing the pet is on the desktop.
@@ -2763,7 +2852,7 @@ namespace BlobbyDesktop
 				{
 				}
 			}
-			if (_stopRestore) Native.RestoreWindow(_dshWindow, _stopFocus);
+			if (_stopRestore) RestoreDshWindow(_stopFocus);
 			Dictionary<string, object> payload = new Dictionary<string, object>();
 			payload["type"] = "exit";
 			payload["reason"] = _stopReason;
