@@ -249,9 +249,9 @@ test('facts heartbeat reports the helper prepared state for the active clear', a
 	const { manager, tempRoot } = await makeManager()
 	try {
 		const prepared = await manager.prepare(makeBundle())
-		assert.equal(manager.facts(prepared.session, { running: false }).prepared, true)
+		assert.equal((await manager.facts(prepared.session, { running: false })).prepared, true)
 		const started = await manager.start(makeBundle())
-		assert.equal(manager.facts(started.session, { running: false }).prepared, false)
+		assert.equal((await manager.facts(started.session, { running: false })).prepared, false)
 		await manager.stop(started.session, { dispose: true })
 	} finally {
 		manager.dispose()

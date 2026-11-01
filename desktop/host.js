@@ -289,6 +289,11 @@ export class DesktopHelperManager {
 	_onMessage(session, message) {
 		if (!message || typeof message !== 'object') return
 		try { this.onEvent?.(message) } catch (ignored) { /* diagnostics only */ }
+		if (message.type === 'shown' || message.type === 'hidden' || message.type === 'exit') {
+			// Diagnostic: pair the helper's lifecycle message with the host session
+			// flag so a prepared/visible mismatch can be attributed.
+			console.log(`[blobby] helper ${message.type} session=${session.id} prepared=${session.prepared} visible=${session.visible} reason=${message.reason ?? ''}`)
+		}
 		if (message.type === 'ready') {
 			session.ready = true
 			clearTimeout(session.readyTimer)
@@ -383,11 +388,27 @@ export class DesktopHelperManager {
 		return session
 	}
 
-	_pendingResult(session) {
+	async _statusPhase(session) {
+		try {
+			const raw = await this.fs.readFile(join(session.dir, 'status.json'), 'utf8')
+			const status = JSON.parse(raw)
+			return typeof status?.phase === 'string' ? status.phase : undefined
+		} catch (ignored) {
+			return undefined
+		}
+	}
+
+	async _pendingResult(session) {
+		// The helper's status.json is authoritative for prepared/visible: the
+		// message stream can miss/lose a hidden or shown message, and a stale
+		// host-side flag would leave the client active forever.
+		const phase = await this._statusPhase(session)
+		const prepared = phase !== undefined ? phase === 'prepared' : session.prepared === true
 		return {
 			version: session.version,
 			settings: { ...session.settings, desktopDisplay: session.settings.desktopDisplay !== false },
-			prepared: session.prepared === true,
+			prepared,
+			...(phase ? { phase } : {}),
 			...(session.hiddenReason ? { hiddenReason: session.hiddenReason } : {}),
 		}
 	}
@@ -444,7 +465,7 @@ export class DesktopHelperManager {
 		})
 	}
 
-	facts(sessionId, rawFacts) {
+	async facts(sessionId, rawFacts) {
 		const session = this._requireSession(sessionId)
 		const facts = normalizeDesktopFacts(rawFacts)
 		session.facts = facts
@@ -452,7 +473,10 @@ export class DesktopHelperManager {
 		this._writeStdin(session, { type: 'facts', facts })
 		// The heartbeat carries the prepared flag so the client can clear its
 		// active state even if the hidden renderer's long-poll never delivers.
-		return { ok: true, prepared: session.prepared === true }
+		// Read the helper's status.json instead of trusting the host-side flag.
+		const phase = await this._statusPhase(session)
+		const prepared = phase !== undefined ? phase === 'prepared' : session.prepared === true
+		return { ok: true, prepared, ...(phase ? { phase } : {}) }
 	}
 
 	_writeStdin(session, value) {
@@ -747,7 +771,7 @@ export function createDesktopRoutes(manager) {
 			fetch: wrap(async request => {
 				const body = await readJsonBody(request)
 				if (!body || typeof body !== 'object') throw httpError(400, 'desktop facts are required')
-				return jsonResponse(manager.facts(String(body.session ?? ''), body.facts))
+				return jsonResponse(await manager.facts(String(body.session ?? ''), body.facts))
 			}),
 		},
 		{

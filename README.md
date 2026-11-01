@@ -124,7 +124,7 @@ Thanks to the VS Code team and the original Blobby authors for the character and
 - Diagnostics: with `?blobbyDebug=1` (or `localStorage["dsh.vscode-pet.debug"]="1"`),
   `window.__dshBlobby.memory()` reports the JS heap, image/colored cache sizes, desktop frame bytes
   and timer/listener/DOM counts; the helper's `status.json` reports `frames: {loaded,total,bytes}`.
-- 1.2.16 handoff fixes: blur/visibility start the helper in the event itself (a 250ms timer in a
+- 1.2.17 handoff fixes: blur/visibility start the helper in the event itself (a 250ms timer in a
   minimized renderer can be throttled/frozen); the facts heartbeat's response carries the helper's
   `prepared` flag so the client clears `active` even when the hidden renderer's long-poll stalls (the
   `/pending` wait is also bounded and retried); and the helper reports `stopReason`,
@@ -241,5 +241,6 @@ DSH grab cursor captured at runtime (byte-identical icon/hotspot), the drag resi
 thinking bubble while a turn runs, a taskbar that stays clickable under the pet window, and a desktop
 context menu that appears at its final position without a flash.
 The helper's geometry, physics and state-machine self-test runs in the test suite.
+
 
 

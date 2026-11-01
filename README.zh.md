@@ -100,7 +100,7 @@ thinking 气泡。主图为 144×144（插件卡片 36px 的 4 倍），`icons/i
 - 诊断：加 `?blobbyDebug=1`（或 `localStorage["dsh.vscode-pet.debug"]="1"`）后，
   `window.__dshBlobby.memory()` 会报告 JS heap、图片/颜色缓存大小、桌面帧字节数、定时器/监听器/DOM
   数量；helper 的 `status.json` 会报告 `frames: {loaded, total, bytes}`。
-- 1.2.16 的桌面传送修复：失焦/隐藏时在事件里直接 start（最小化后的 renderer 里 250ms 定时器可能被
+- 1.2.17 的桌面传送修复：失焦/隐藏时在事件里直接 start（最小化后的 renderer 里 250ms 定时器可能被
   节流/冻结）；facts 心跳的响应带回 helper 的 `prepared`，即使隐藏页的长轮询停住，客户端也能清掉
   `active`（`/pending` 等待也加了上限并重试）；helper 的 `status.json` 报告 `stopReason`、
   `dshWindow`、`dshIconic`、`dshForeground`、`dshWasIconic`，客户端快照暴露 `starting`、
@@ -206,4 +206,5 @@ VS Code 1.144 的 Blobby 逐帧对比了落下与重生轨迹。
 思考气泡同步、任务栏在宠物窗口下方仍可点击，以及桌面右键菜单在最终位置显示而不闪跳。
 
 `docs/states.png` 是状态矩阵，`docs/hats.png` 与 `docs/color.png` 是自定义面板截图。
+
 
