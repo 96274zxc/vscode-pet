@@ -199,8 +199,8 @@ Thanks to the VS Code team and the original Blobby authors for the character and
 - 1.2.25 desktop click/wake flash fix: the helper sized its layered pet window from the *current*
   animation's frame width, so every state change that switched to a wider sprite (waking/sleep 120,
   buttonPress 160, typing 168, painting 192) resized the window. A layered-window resize recreates
-  its surface and the DWM presents the previous content (and an unpainted edge) for one frame — the
-  flash and the thin dark edge seen during the wake shake. The pads are now computed once from the
+  its surface and the DWM presents the previous content for one frame, which is the flash seen when
+  clicking the desktop pet or during the wake shake. The pads are now computed once from the
   widest/tallest frame in the whole manifest, so the window keeps one size (208×112 at scale 1) for
   every state and only moves with the pet; click-through and the taskbar-hugging bottom edge are
   unchanged. This also removes the frame that was exposed when the pet returned to idle after waking.
@@ -345,8 +345,12 @@ The 1.2.25 constant-size fix was verified by sampling the helper's `status.json`
 state changes: a sleeping pet clicked into `waking` and back to `idle` keeps `208×112` throughout
 (previously 136×112 → 112×112), and clicking an idle pet into the wide `cool` state also keeps
 `208×112`. The rendered `buddy-waking` frames were also compared pixel-by-pixel with the official
-`buddy-waking-*.spritesheet.png`: the geometry is identical (only the body colors differ), so the
-edge seen during the shake came from the window resize, not from the sprite art.
+`buddy-waking-*.spritesheet.png`: the port's frames are a faithful recolor (the same pixels, with
+the body/shadow palette from VS Code's own `chatPetColors.ts`). The thin dark line at the body's
+side during the shake is the *official* 1px shadow outline (source color `#004e7c`), which the
+palette maps to `#808080` for the White preset because VS Code itself uses `body.darken(0.5)`;
+it is not an added border, and it stands out most with a white body. The port keeps that behavior
+to stay faithful to the original; choosing a saturated color preset makes the shadow blend again.
 The helper's geometry, physics and state-machine self-test runs in the test suite.
 
 

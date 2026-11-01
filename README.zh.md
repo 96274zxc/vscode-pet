@@ -152,10 +152,10 @@ thinking 气泡。主图为 144×144（插件卡片 36px 的 4 倍），`icons/i
   桌面 helper 的状态机本来就有这段处理。
 - 1.2.25 桌面上点击/wake 闪烁的修复：helper 之前按*当前*动画的帧宽来设置分层宠物窗口的大小，所以
   每次切换到更宽的状态（sleep/waking 120、buttonPress 160、typing 168、painting 192）都会改变窗口
-  尺寸。分层窗口 resize 会重建表面，DWM 会有一帧显示旧内容（以及未绘制的边缘）——这就是唤醒抖动时
-  看到的闪烁和那条细细的暗边。现在 padding 只按 manifest 里最宽/最高的帧算一次，窗口在所有状态下
-  保持同一尺寸（scale 1 时 208×112），只随宠物移动；点击穿透和贴任务栏的底边都不变。唤醒结束回到
-  idle 的那一帧也随之消失。
+  尺寸。分层窗口 resize 会重建表面，DWM 会有一帧显示旧内容——这就是点击桌面宠物或唤醒抖动时看到的
+  闪烁。现在 padding 只按 manifest 里最宽/最高的帧算一次，窗口在所有状态下保持同一尺寸
+  （scale 1 时 208×112），只随宠物移动；点击穿透和贴任务栏的底边都不变。唤醒结束回到 idle 的那一帧
+  也随之消失。
 - helper 剩余的主要占用来自 PowerShell 5.1 + .NET/WPF 运行时本身；要移除它需要更换 helper 宿主，
   不在当前实现范围内。
 
@@ -285,8 +285,10 @@ phase 为 `starting`）、start 后立刻发生的 facts 心跳返回 `prepared:
 1.2.25 的固定窗口尺寸修复通过采样 helper 的 `status.json` 窗口矩形验证：点击睡着的宠物从 `waking`
 回到 `idle` 的整个过程中窗口始终保持 `208×112`（修复前是 136×112 → 112×112），点击 idle 宠物进入
 宽帧 `cool` 状态时也保持 `208×112`。另外把渲染出的 `buddy-waking` 帧与官方
-`buddy-waking-*.spritesheet.png` 逐像素对比：几何完全一致（只有身体颜色不同），说明抖动时看到的
-暗边来自窗口 resize，而不是 sprite 素材本身。
+`buddy-waking-*.spritesheet.png` 逐像素对比：port 的帧与官方素材是同一批像素的忠实重着色（调色板
+来自 VS Code 自己的 `chatPetColors.ts`）。抖动时身体侧面那条细暗边是官方素材自带的 1px 阴影描边
+（源色 `#004e7c`），调色板按 `body.darken(0.5)` 把它映射成 `#808080`——这是 VS Code 原版对白色
+预设的同样结果，不是 port 额外加的边框；白色身体下对比度最高，换成饱和颜色预设就会重新融合。
 
 `docs/states.png` 是状态矩阵，`docs/hats.png` 与 `docs/color.png` 是自定义面板截图。
 
