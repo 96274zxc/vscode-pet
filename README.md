@@ -101,7 +101,9 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   Hat**; unlock hints, rewards and "new" badges are not shown. `/blobby` still unlocks **Color
   Customization** for the solid and custom colors.
 - Click reactions include a rare (~1%) **yapping** fall: Blobby tips over and opens its mouth; the
-  light gap is the official sprite's open mouth, not missing artwork.
+  light gap is the official sprite's open mouth, not missing artwork. Clicking a **sleeping** Blobby
+  first plays the official shake-then-wake animation (the 8-frame `buddy-waking` sprite, 880ms) and
+  the status line reports that it woke up; only the next click plays a random reaction.
 - Stable/Insiders colors plus the eight official solid presets and a custom hex color (unlocked by
   `/blobby`). Hats and colors are applied immediately and persist.
 - Blobby's jump game: Space to charge, release to jump, Left/Right to aim or hop, Escape to exit,
@@ -187,6 +189,13 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   position. At the default 48px size the bubble now starts exactly on the divider (measured 0.00px
   offset); with the clamp, pets much larger than the composer gap keep a small overhang instead of
   covering the eyes.
+- 1.2.24 sleeping-click wake fix: the pointer-down handler set the `waking` transient but never
+  re-rendered, so clicking a sleeping Blobby left it asleep on screen; the shake-then-wake animation
+  only appeared if an unrelated facts update happened to recompute the state (the keyboard path
+  worked because `activate()` called `recompute()` itself). `_wake()` now renders immediately when it
+  starts the waking animation (guarded against the nested call from `recompute()`'s busy-start path),
+  so the official 8-frame `buddy-waking` sprite plays for 880ms and then returns to idle, matching
+  the VS Code original. The desktop helper already handled this in its state machine.
 - The remaining helper footprint is the PowerShell 5.1 + .NET/WPF runtime itself; removing it would
   need a different helper host and is out of scope for the current implementation.
 
@@ -319,6 +328,11 @@ top 644 and the composer card at 692, the status divider sits at 637 and the bub
 lands on 637 as well (0.00px offset; the screenshot's divider row and bubble top edge are the same
 row). The anchor is computed from the divider rect, so it follows a different window/font layout and
 re-runs on scroll/resize instead of assuming a fixed offset.
+The 1.2.24 wake fix was exercised on the live pet in both placements. In the DSH window the
+`data-state` timeline after a real mouse click is `sleep` → `waking` (880ms) → `idle`, and a burst
+capture of the pet confirmed the rendered sprite changed for the waking frames. With the desktop
+helper shown (DSH minimized) the helper's `status.json` sampled around the click shows the same
+`sleep` → `waking` → `idle` sequence, so both placements play the shake-then-wake animation.
 The helper's geometry, physics and state-machine self-test runs in the test suite.
 
 

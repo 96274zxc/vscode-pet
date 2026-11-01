@@ -3174,6 +3174,7 @@ class ChatPetController {
 		this.bounceCount = 0
 		this._lastClickInteraction = undefined
 		this._motionReduced = false
+		this._recomputing = false
 		this._gaze = [0, 0]
 		this._gazeRaf = undefined
 		this._cursor = undefined
@@ -3592,6 +3593,17 @@ class ChatPetController {
 
 	recompute(restart = false) {
 		if (this.disposed || !this.visible || this._desktopSuspended || this._desktopTransition) return
+		// _wake() renders the waking animation from inside recompute (busy start),
+		// so guard the re-entrant call it would otherwise make.
+		this._recomputing = true
+		try {
+			this._recompute(restart)
+		} finally {
+			this._recomputing = false
+		}
+	}
+
+	_recompute(restart = false) {
 		if (this.onTheRun) {
 			this._renderState('onTheRun', restart)
 			this.button.classList.add('on-the-run')
@@ -3659,6 +3671,11 @@ class ChatPetController {
 					this.recompute()
 				}
 			}, WAKE_STATE_DURATION)
+			// Render the waking sprite right away: the pointer-down handler only
+			// sets the transient, and without this the pet stayed asleep on screen
+			// after a click (the shake-then-wake animation never played) until an
+			// unrelated facts update recomputed the state.
+			if (!this._recomputing) this.recompute()
 		}
 	}
 
