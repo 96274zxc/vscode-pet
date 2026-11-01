@@ -2855,7 +2855,10 @@ class ChatPetDesktopBridge {
 	_onVisibilityChange() {
 		if (this.disposed) return
 		if (typeof document !== 'undefined' && document.hidden) {
-			this._scheduleStart()
+			// Start immediately: a 250ms setTimeout in a hidden renderer can be
+			// throttled/frozen, which was leaving the desktop handoff never started.
+			this._cancelScheduledStart()
+			this.start()
 		} else {
 			this._cancelScheduledStart()
 			if (this._starting) this._startToken += 1
@@ -2874,7 +2877,10 @@ class ChatPetDesktopBridge {
 
 	_onWindowBlur() {
 		if (this.disposed || !this.enabled) return
-		this._scheduleStart()
+		// Same as visibilitychange: start in the event itself, not via a timer that
+		// a background window may throttle.
+		this._cancelScheduledStart()
+		this.start()
 	}
 
 	_onPrefsChange() {
