@@ -1009,6 +1009,46 @@ namespace BlobbyDesktop
 		}
 	}
 
+	// The desktop pet has no composer to hide behind, so it sinks behind the
+	// taskbar edge: the host is translated down and clipped to the part above the
+	// floor. Both values come from the same offset so the visible bottom edge
+	// stays on the floor throughout the slide.
+	internal static class DesktopRunMotion
+	{
+		public const double HideFraction = 40.0 / 48.0;
+		public const double PeekFraction = 10.0 / 48.0;
+		public const double Duration = 320;
+
+		public static double HideOffset(double displaySize)
+		{
+			return displaySize * HideFraction;
+		}
+
+		public static double PeekOffset(double displaySize)
+		{
+			return displaySize * PeekFraction;
+		}
+
+		public static double EaseOut(double fraction)
+		{
+			double clamped = Math.Max(0, Math.Min(1, fraction));
+			double inverse = 1 - clamped;
+			return 1 - inverse * inverse * inverse;
+		}
+
+		public static double Offset(double from, double to, double elapsed, bool motionReduced)
+		{
+			if (motionReduced || elapsed >= Duration) return to;
+			if (elapsed <= 0) return from;
+			return from + (to - from) * EaseOut(elapsed / Duration);
+		}
+
+		public static double VisibleHeight(double displaySize, double offset)
+		{
+			return Math.Max(1, displaySize - Math.Max(0, offset));
+		}
+	}
+
 	internal static class DesktopSelfTest
 	{
 		private static void Check(List<string> failures, string name, bool condition, string detail)
@@ -1049,6 +1089,19 @@ namespace BlobbyDesktop
 			double[] bounce = DesktopPhysics.MouseBounce(0, 1200, 0, -900, 1024, 1000, 48, physics);
 			Check(failures, "mouse bounce goes up", bounce[1] < 0, bounce[1].ToString(CultureInfo.InvariantCulture));
 			checks.Add("mouse-bounce");
+			double hideOffset = DesktopRunMotion.HideOffset(48);
+			double peekOffset = DesktopRunMotion.PeekOffset(48);
+			Check(failures, "run hide offset", Math.Abs(hideOffset - 40) < 0.001, hideOffset.ToString(CultureInfo.InvariantCulture));
+			Check(failures, "run peek offset", Math.Abs(peekOffset - 10) < 0.001, peekOffset.ToString(CultureInfo.InvariantCulture));
+			Check(failures, "run starts at rest", Math.Abs(DesktopRunMotion.Offset(0, hideOffset, 0, false) - 0) < 0.001, DesktopRunMotion.Offset(0, hideOffset, 0, false).ToString(CultureInfo.InvariantCulture));
+			double halfway = DesktopRunMotion.Offset(0, hideOffset, DesktopRunMotion.Duration / 2, false);
+			Check(failures, "run eases between ends", halfway > 0 && halfway < hideOffset, halfway.ToString(CultureInfo.InvariantCulture));
+			Check(failures, "run reaches target", Math.Abs(DesktopRunMotion.Offset(0, hideOffset, DesktopRunMotion.Duration, false) - hideOffset) < 0.001, DesktopRunMotion.Offset(0, hideOffset, DesktopRunMotion.Duration, false).ToString(CultureInfo.InvariantCulture));
+			Check(failures, "run respects reduced motion", Math.Abs(DesktopRunMotion.Offset(0, hideOffset, 1, true) - hideOffset) < 0.001, DesktopRunMotion.Offset(0, hideOffset, 1, true).ToString(CultureInfo.InvariantCulture));
+			Check(failures, "run returns to rest", Math.Abs(DesktopRunMotion.Offset(hideOffset, 0, DesktopRunMotion.Duration, false)) < 0.001, DesktopRunMotion.Offset(hideOffset, 0, DesktopRunMotion.Duration, false).ToString(CultureInfo.InvariantCulture));
+			Check(failures, "run visible height", Math.Abs(DesktopRunMotion.VisibleHeight(48, hideOffset) - 8) < 0.001 && Math.Abs(DesktopRunMotion.VisibleHeight(48, peekOffset) - 38) < 0.001, DesktopRunMotion.VisibleHeight(48, hideOffset).ToString(CultureInfo.InvariantCulture));
+			Check(failures, "run visible bottom stays on the floor", Math.Abs(DesktopRunMotion.VisibleHeight(48, halfway) + halfway - 48) < 0.001, (DesktopRunMotion.VisibleHeight(48, halfway) + halfway).ToString(CultureInfo.InvariantCulture));
+			checks.Add("run-motion");
 
 			DesktopModel model = new DesktopModel();
 			DesktopStateMachine machine = new DesktopStateMachine();

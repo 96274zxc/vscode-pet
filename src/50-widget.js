@@ -75,6 +75,7 @@ class ChatPetController {
 		this._lastFacing = 'right'
 		this._customPosition = false
 		this._horizontalAnchor = undefined
+		this._runClipTimer = undefined
 		this._layoutScheduled = false
 		this._directionChanges = new ChatPetDirectionChangeController()
 		this._facing = new ChatPetFacingController()
@@ -113,6 +114,7 @@ class ChatPetController {
 		if (next) {
 			this.root.style.display = ''
 			this.button.tabIndex = 0
+			if (!this.onTheRun) this._clearRunClip()
 			this.layout()
 			this.recompute(true)
 			this._redrawActiveFrame?.()
@@ -338,6 +340,10 @@ class ChatPetController {
 		this.button.style.height = `${this.displaySize}px`
 		this.button.style.setProperty('--chat-pet-run-hide', `${this.displaySize * (40 / 48)}px`)
 		this.button.style.setProperty('--chat-pet-run-peek', `${this.displaySize * (10 / 48)}px`)
+		// The run clip lives on the mount, not the button: it must stay at the
+		// composer's top edge while the button translates down, so the body is
+		// covered by the input card instead of being cut by a moving clip shape.
+		this.mount.style.setProperty('--chat-pet-run-occlude', `calc(100% - ${Math.round(input.top * 10) / 10}px)`)
 		this.visual.style.width = `${CHAT_PET_DISPLAY_SIZE}px`
 		this.visual.style.height = `${CHAT_PET_DISPLAY_SIZE}px`
 		this.visual.style.transform = `scale(${this.scale})`
@@ -492,6 +498,7 @@ class ChatPetController {
 
 	_recompute(restart = false) {
 		if (this.onTheRun) {
+			this._beginRunClip()
 			this._renderState('onTheRun', restart)
 			this.button.classList.add('on-the-run')
 			this.button.tabIndex = -1
@@ -1535,6 +1542,7 @@ class ChatPetController {
 		}
 		this.root.style.display = ''
 		this.button.tabIndex = 0
+		if (!this.onTheRun) this._clearRunClip()
 		this.layout()
 		this.recompute(true)
 		this._resetIdle()
@@ -1551,6 +1559,7 @@ class ChatPetController {
 		}
 		this.root.style.display = ''
 		this.button.tabIndex = 0
+		if (!this.onTheRun) this._clearRunClip()
 		this.layout()
 		this.recompute(true)
 		this._resetIdle()
@@ -1576,6 +1585,7 @@ class ChatPetController {
 			this.recompute(true)
 			return
 		}
+		this._clearRunClip()
 		const bounds = this._bounds()
 		if (!bounds) {
 			this._desktopTransition = false
@@ -1603,6 +1613,34 @@ class ChatPetController {
 
 	/* ------------------------------------------------------------- on run */
 
+	_clearRunClip() {
+		clearTimeout(this._runClipTimer)
+		this._runClipTimer = undefined
+		this.mount.classList.remove('run-clipped')
+	}
+
+	_beginRunClip() {
+		clearTimeout(this._runClipTimer)
+		this._runClipTimer = undefined
+		this.mount.classList.add('run-clipped')
+	}
+
+	_endRunClip() {
+		clearTimeout(this._runClipTimer)
+		this._runClipTimer = undefined
+		if (!this.mount.classList.contains('run-clipped')) return
+		if (this._motionReduced) {
+			this.mount.classList.remove('run-clipped')
+			return
+		}
+		// Keep the composer-edge clip through the upward slide, so the part of
+		// the body that has not come back yet stays hidden behind the input.
+		this._runClipTimer = setTimeout(() => {
+			this._runClipTimer = undefined
+			if (!this.onTheRun) this.mount.classList.remove('run-clipped')
+		}, 360)
+	}
+
 	setOnTheRun(value) {
 		this.onTheRun = value
 		chatPetPrefs.set({ onTheRun: value })
@@ -1617,7 +1655,15 @@ class ChatPetController {
 		}
 		this.button.classList.toggle('on-the-run', value)
 		this.button.classList.remove('peeking')
-		if (value) this._forgetHorizontalPosition()
+		if (value) {
+			this._forgetHorizontalPosition()
+			// Add the composer-edge clip before layout(): layout's
+			// getBoundingClientRect calls force a style recalc, and the 320ms
+			// transition must be the one that starts with the run transform.
+			this._beginRunClip()
+		} else {
+			this._endRunClip()
+		}
 		this.layout()
 		if (value) {
 			this._clearIdle()
@@ -1626,7 +1672,6 @@ class ChatPetController {
 		} else {
 			clearInterval(this._runTimer)
 			this._runTimer = undefined
-			this.button.classList.remove('returning-from-run')
 			this._resetIdle()
 			this.host.status(this._tr('status.comeBack'))
 		}
@@ -1643,6 +1688,7 @@ class ChatPetController {
 		const prefs = chatPetPrefs.get()
 		const oldVariant = this.variant
 		const previousScale = this.scale
+		const previousOnTheRun = this.onTheRun
 		const wasVisible = this.visible
 		this.prefs = prefs
 		this.scale = prefs.scale
@@ -1651,6 +1697,7 @@ class ChatPetController {
 		const accessoryChanged = this.accessoryId !== prefs.accessory
 		this.accessoryId = prefs.accessory
 		this.onTheRun = prefs.onTheRun
+		if (previousOnTheRun && !this.onTheRun) this._endRunClip()
 		if (this._desktopSuspended) return
 		if (prefs.visible === false) {
 			this.setVisible(false)
@@ -1755,6 +1802,7 @@ class ChatPetController {
 		clearTimeout(this.bounceTimer)
 		clearTimeout(this.respawnTimer)
 		clearTimeout(this.frameTimer)
+		clearTimeout(this._runClipTimer)
 		clearInterval(this._runTimer)
 		if (this._gazeRaf !== undefined) cancelAnimationFrame(this._gazeRaf)
 		this._resizeObserver?.disconnect()

@@ -308,17 +308,27 @@
 
 .chat-pet-button.on-the-run {
 	transform: translateY(var(--chat-pet-run-hide, 40px));
-	clip-path: inset(0 0 var(--chat-pet-run-hide, 40px) 0);
 	z-index: auto;
-	transition: transform 320ms ease-out, clip-path 320ms ease-out;
 }
 
 .chat-pet-button.on-the-run.peeking {
 	transform: translateY(var(--chat-pet-run-peek, 10px));
-	clip-path: inset(0 0 var(--chat-pet-run-peek, 10px) 0);
 }
 
-.chat-pet-button.returning-from-run { z-index: auto; }
+/* Blobby's layer paints above the composer, so the run animation cannot be a
+   real z-order change: clip the whole mount at the composer's top edge while
+   the pet slides. The clip line stays put, so the body keeps moving down and
+   only the part above the input card is visible — no button-level clip-path,
+   which jumped to its end value instead of animating with the transform. */
+.dsh-blobby-mount.run-clipped {
+	clip-path: inset(0 0 var(--chat-pet-run-occlude, 0px) 0);
+}
+
+/* The base button transitions over 200ms; the run needs both directions to
+   match the 320ms slide while the mount keeps the composer-edge clip. */
+.dsh-blobby-mount.run-clipped .chat-pet-button {
+	transition: transform 320ms ease-out;
+}
 
 .chat-pet-button.dragging .chat-pet-sprite,
 .chat-pet-button.dragging .chat-pet-eyes,

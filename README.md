@@ -204,6 +204,15 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   widest/tallest frame in the whole manifest, so the window keeps one size (208×112 at scale 1) for
   every state and only moves with the pet; click-through and the taskbar-hugging bottom edge are
   unchanged. This also removes the frame that was exposed when the pet returned to idle after waking.
+- 1.2.26 run/return animation fix: the in-window "run" state clipped the button itself with
+  `clip-path`, and Chromium applies that change from `none` as a discrete jump (it is not
+  interpolated), so the bottom of the body vanished before the upper body slid down; on the way back
+  the clip was dropped instantly and the pet briefly painted over the composer before sliding up.
+  The occlusion now lives on the pet mount as a fixed `inset()` at the composer card's top edge
+  (`--chat-pet-run-occlude`) and is held for the whole 320ms return slide, so the body slides in and
+  out behind the input card in both directions with no layer change. The desktop helper used to jump
+  between the resting, run and peek poses; it now tweens the same offset with an ease-out curve
+  (320ms, reduced motion snaps), keeping the visible bottom on the taskbar edge as it sinks and rises.
 - The remaining helper footprint is the PowerShell 5.1 + .NET/WPF runtime itself; removing it would
   need a different helper host and is out of scope for the current implementation.
 
@@ -351,6 +360,12 @@ side during the shake is the *official* 1px shadow outline (source color `#004e7
 palette maps to `#808080` for the White preset because VS Code itself uses `body.darken(0.5)`;
 it is not an added border, and it stands out most with a white body. The port keeps that behavior
 to stay faithful to the original; choosing a saturated color preset makes the shadow blend again.
+The 1.2.26 run animation was captured at ~20ms against the composer edge in the live DSH window: on
+the way down the hat's top edge moves 40px over 320ms while the visible bottom stays pinned to the
+composer card's top, and on the way back the body emerges from that same fixed line instead of
+popping over the input. The desktop helper's standalone run was captured the same way: the pet sinks
+below the taskbar edge over ~320ms and rises back through it, with `status.json` reporting
+`runOffset` 40 → 0; the helper self-test covers the motion curve (`run-motion`).
 The helper's geometry, physics and state-machine self-test runs in the test suite.
 
 

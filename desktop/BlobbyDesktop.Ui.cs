@@ -557,6 +557,11 @@ namespace BlobbyDesktop
 		private double _menuHeight = 305;
 		private long _lastPeekAt;
 		private long _peekUntil;
+		private double _runOffset;
+		private double _runFrom;
+		private double _runTarget;
+		private long _runStartedAt;
+		private bool _runAnimating;
 		private long _splatUntil;
 		private long _transientStartedAt;
 
@@ -599,6 +604,9 @@ namespace BlobbyDesktop
 			_lastTick = _startedAt;
 			_state.SetFacts(_facts, _model, _startedAt, _settings.MotionReduced);
 			_state.OnTheRun = _settings.OnTheRun;
+			// A helper that starts already on the run should show the sunken head
+			// immediately instead of playing a slide-in from the resting pose.
+			SnapRunOffset(_state.OnTheRun ? DesktopRunMotion.HideOffset(_displaySize) : 0);
 			_state.ResetIdle(_startedAt, _model);
 			if (!_prepared) BeginStart();
 			// A helper spawned prepared waits hidden; without this the phase stayed
@@ -1425,6 +1433,38 @@ namespace BlobbyDesktop
 			}
 		}
 
+		private void SnapRunOffset(double value)
+		{
+			_runOffset = value;
+			_runFrom = value;
+			_runTarget = value;
+			_runStartedAt = 0;
+			_runAnimating = false;
+		}
+
+		// The run and peek poses are the same translate/clip pair the web pet uses;
+		// animate between them so the desktop copy slides under the taskbar edge
+		// instead of jumping between the resting and hidden poses.
+		private void AdvanceRunOffset(long now, double target)
+		{
+			if (Math.Abs(target - _runTarget) > 0.0001)
+			{
+				_runFrom = _runOffset;
+				_runTarget = target;
+				_runStartedAt = now;
+				_runAnimating = Math.Abs(target - _runFrom) > 0.0001 && !_settings.MotionReduced;
+				if (!_runAnimating) _runOffset = target;
+			}
+			if (!_runAnimating) return;
+			double elapsed = now - _runStartedAt;
+			_runOffset = DesktopRunMotion.Offset(_runFrom, _runTarget, elapsed, _settings.MotionReduced);
+			if (elapsed >= DesktopRunMotion.Duration)
+			{
+				_runOffset = _runTarget;
+				_runAnimating = false;
+			}
+		}
+
 		private void UpdateStart(long now)
 		{
 			double duration = _settings.MotionReduced ? _model.Timings.RespawnReduced : _model.Timings.Respawn;
@@ -1618,7 +1658,23 @@ namespace BlobbyDesktop
 			Transform transform;
 			Point origin = new Point(0.5, 0.5);
 			RectangleGeometry clip = null;
-			if (state == "complete")
+			if (_state.OnTheRun || _runOffset > 0.0001)
+			{
+				bool peeking = _state.OnTheRun && _peekUntil > 0 && now < _peekUntil;
+				double target = _state.OnTheRun
+					? (peeking ? DesktopRunMotion.PeekOffset(_displaySize) : DesktopRunMotion.HideOffset(_displaySize))
+					: 0;
+				AdvanceRunOffset(now, target);
+				TransformGroup runGroup = new TransformGroup();
+				runGroup.Children.Add(new TranslateTransform(0, _runOffset));
+				transform = runGroup;
+				key = "run:" + Math.Round(_runOffset * 4);
+				if (_runOffset > 0.0001)
+				{
+					clip = new RectangleGeometry(new Rect(0, 0, _displaySize, DesktopRunMotion.VisibleHeight(_displaySize, _runOffset)));
+				}
+			}
+			else if (state == "complete")
 			{
 				double duration = Math.Max(1, _model.Timings.Complete);
 				double elapsed = now - _transientStartedAt;
@@ -1656,17 +1712,6 @@ namespace BlobbyDesktop
 				transform = group;
 				origin = new Point(0.3, 0.8);
 				key = "yappingMouthOpen";
-			}
-			else if (_state.OnTheRun)
-			{
-				bool peeking = _peekUntil > 0 && now < _peekUntil;
-				double offset = peeking ? _displaySize * (10.0 / 48.0) : _displaySize * (40.0 / 48.0);
-				TransformGroup group = new TransformGroup();
-				group.Children.Add(new TranslateTransform(0, offset));
-				transform = group;
-				double visible = _displaySize * ((peeking ? 38.0 : 8.0) / 48.0);
-				clip = new RectangleGeometry(new Rect(0, 0, _displaySize, Math.Max(1, visible)));
-				key = "run:" + (peeking ? 1 : 0);
 			}
 			else if (_state.Dragging && !_settings.MotionReduced)
 			{
@@ -2023,13 +2068,10 @@ namespace BlobbyDesktop
 
 		private bool IsInsidePet(double x, double y)
 		{
-			if (_state.OnTheRun)
+			if (_state.OnTheRun || _runOffset > 0.0001)
 			{
-				bool peeking = _peekUntil > 0 && Now() < _peekUntil;
-				double offset = _displaySize * ((peeking ? 10.0 : 40.0) / 48.0);
-				double visible = _displaySize * ((peeking ? 38.0 : 8.0) / 48.0);
-				double top = _petTop + offset;
-				return x >= _petLeft && x <= _petLeft + _displaySize && y >= top && y <= top + visible;
+				double top = _petTop + _runOffset;
+				return x >= _petLeft && x <= _petLeft + _displaySize && y >= top && y <= _petTop + _displaySize;
 			}
 			return x >= _petLeft && x <= _petLeft + _displaySize && y >= _petTop && y <= _petTop + _displaySize;
 		}
@@ -2593,6 +2635,7 @@ namespace BlobbyDesktop
 			_lastTick = _startedAt;
 			_state.SetFacts(_facts, _model, _startedAt, _settings.MotionReduced);
 			_state.OnTheRun = _settings.OnTheRun;
+			SnapRunOffset(_state.OnTheRun ? DesktopRunMotion.HideOffset(_displaySize) : 0);
 			_state.ResetIdle(_startedAt, _model);
 			BeginStart();
 			_timer.Stop();
@@ -2933,6 +2976,8 @@ namespace BlobbyDesktop
 				status["factsGrabbing"] = _facts.Grabbing;
 				status["factsPetRect"] = _facts.HasPetRect;
 				status["onTheRun"] = _settings.OnTheRun;
+				status["runOffset"] = _runOffset;
+				status["runPeeking"] = _peekUntil > 0 && now < _peekUntil;
 				status["desktopDisplay"] = _settings.DesktopDisplay;
 				status["menuOpen"] = _menuOpen;
 				status["stopReason"] = _stopReason;
