@@ -312,6 +312,7 @@ export class DesktopHelperManager {
 			session.settings = mergeDesktopSettings(session.settings, message.settings)
 			session.prepared = true
 			session.visible = false
+			session.hiddenReason = typeof message.reason === 'string' ? message.reason : undefined
 			session.version += 1
 			this._wakeWaiters(session)
 			const resolveHidden = session.resolveHidden
@@ -346,12 +347,14 @@ export class DesktopHelperManager {
 			sessionId: session.id,
 			settings: { ...session.settings, desktopDisplay: session.settings.desktopDisplay !== false },
 			command: session.command,
+			hiddenReason: session.hiddenReason,
 		}
 		session.resolveExit?.({
 			code,
 			signal,
 			settings: { ...session.settings, desktopDisplay: session.settings.desktopDisplay !== false },
 			command: session.command,
+			hiddenReason: session.hiddenReason,
 		})
 		session.resolveExit = undefined
 		this._wakeWaiters(session)
@@ -385,6 +388,7 @@ export class DesktopHelperManager {
 			version: session.version,
 			settings: { ...session.settings, desktopDisplay: session.settings.desktopDisplay !== false },
 			prepared: session.prepared === true,
+			...(session.hiddenReason ? { hiddenReason: session.hiddenReason } : {}),
 		}
 	}
 

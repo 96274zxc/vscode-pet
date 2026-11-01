@@ -584,6 +584,7 @@ class ChatPetDesktopBridge {
 		this._startToken = 0
 		this._warmupRequested = false
 		this._lastSettings = undefined
+		this._lastHiddenReason = undefined
 		this._sentTheme = undefined
 		this._sentLabels = undefined
 		this._startTimer = undefined
@@ -625,7 +626,11 @@ class ChatPetDesktopBridge {
 		if (this.supported && this.prefs.get().desktopDisplay) {
 			this.prewarm()
 			this._startFactsTimer()
-			if (typeof document !== 'undefined' && (document.hidden || document.hasFocus?.() === false)) this._scheduleStart()
+			// Only auto-show when we know the app is minimized. During startup the
+			// renderer can briefly report hasFocus()=false while the DSH window is
+			// actually taking focus; starting then used to show and immediately hide
+			// the helper. The blur handler covers the normal unfocus path.
+			if (typeof document !== 'undefined' && document.hidden) this._scheduleStart()
 		}
 	}
 
@@ -648,6 +653,9 @@ class ChatPetDesktopBridge {
 			settings: this._lastSettings,
 			enabled: this.enabled,
 			smartHide: this.smartHide,
+			starting: this._starting,
+			stopping: this._stopping,
+			lastHiddenReason: this._lastHiddenReason,
 		}
 	}
 
@@ -917,6 +925,7 @@ class ChatPetDesktopBridge {
 					if (abort?.signal.aborted || this.session !== session) return
 					if (result && Number.isFinite(result.version)) this.version = result.version
 					if (result?.settings) this._applyDesktopSettings(result.settings)
+					if (typeof result?.hiddenReason === 'string') this._lastHiddenReason = result.hiddenReason
 					if (result?.prepared === true && this.active) {
 						this.stop({ returning: true })
 						return
