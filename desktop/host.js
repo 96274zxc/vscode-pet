@@ -390,7 +390,9 @@ export class DesktopHelperManager {
 
 	async _statusPhase(session) {
 		try {
-			const raw = await this.fs.readFile(join(session.dir, 'status.json'), 'utf8')
+			// Use the real fs, not this.fs: the injected fs is the plugin host's
+			// virtual/scoped fs and may not expose the OS temp directory.
+			const raw = await nodeFs.readFile(join(session.dir, 'status.json'), 'utf8')
 			const status = JSON.parse(raw)
 			return typeof status?.phase === 'string' ? status.phase : undefined
 		} catch (ignored) {
