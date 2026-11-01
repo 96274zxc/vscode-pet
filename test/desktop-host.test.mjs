@@ -14,6 +14,7 @@ import {
 	mergeDesktopSettings,
 	normalizeDesktopFacts,
 	normalizeDesktopSettings,
+	normalizeDesktopTheme,
 	sanitizeDesktopCommand,
 	validateDesktopBundle,
 } from '../desktop/protocol.js'
@@ -137,6 +138,29 @@ async function makeManager(extra = {}) {
 	return { manager, tempRoot, spawn }
 }
 
+// Windows can refuse a recursive rmdir while antivirus or the filesystem still
+// holds the freshly written frame files; retry briefly instead of failing the
+// suite on a transient EPERM.
+async function removeTempRoot(tempRoot) {
+	for (let attempt = 0; attempt < 10; attempt++) {
+		try {
+			await rm(tempRoot, { recursive: true, force: true })
+			return
+		} catch (error) {
+			if (attempt === 9) throw error
+			await new Promise(resolve => setTimeout(resolve, 50))
+		}
+	}
+}
+
+// Session directories are removed asynchronously after the helper exits; on a
+// busy Windows box the removal can trail the stop response by a few ms.
+async function waitForRemoved(target, timeout = 2000) {
+	const deadline = Date.now() + timeout
+	while (existsSync(target) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10))
+	return !existsSync(target)
+}
+
 test('desktop bundle validation accepts the client contract and rejects malformed bundles', () => {
 	const normalized = validateDesktopBundle(makeBundle())
 	assert.equal(normalized.protocol, DESKTOP_PROTOCOL)
@@ -187,6 +211,14 @@ test('desktop settings, facts and commands normalize independently', () => {
 	assert.equal(visualFacts.theme.menuBackground, '#ffffff')
 	assert.equal(visualFacts.labels['menu.hats'], 'x-menu.hats')
 	assert.equal(normalizeDesktopFacts({ labels: { 'menu.hats': '' } }).labels, undefined)
+	// Missing fields fall back inside the same palette, never to a dark label on
+	// a light menu (the bug that made the desktop menu unreadable in light mode).
+	assert.equal(normalizeDesktopTheme({ dark: false }).menuText, '#1f2329')
+	assert.equal(normalizeDesktopTheme({ dark: false }).menuMuted, '#6b7280')
+	assert.equal(normalizeDesktopTheme({ dark: true }).menuText, '#f2f3f5')
+	assert.equal(normalizeDesktopTheme({ dark: false, menuBackground: '#f8f9fa', menuHover: '#ebedef' }).menuText, '#1f2329')
+	assert.equal(normalizeDesktopTheme({ dark: false, menuText: '#0f1115' }).menuText, '#0f1115')
+	assert.equal(normalizeDesktopTheme({ dark: false, menuText: 'bad' }).menuText, '#1f2329')
 	assert.equal(sanitizeDesktopCommand('hats'), 'hats')
 	assert.equal(sanitizeDesktopCommand('rm -rf'), undefined)
 	assert.equal(isDesktopRequestSupported('win32', true), true)
@@ -226,11 +258,11 @@ test('helper manager starts, streams settings, answers pending reads and stops',
 		const again = await manager.stop(started.session)
 		assert.equal(again.settings.scale, 1.4)
 		await manager.stop(started.session, { dispose: true })
-		assert.equal(existsSync(path.join(tempRoot, started.session)), false)
+		assert.equal(await waitForRemoved(path.join(tempRoot, started.session)), true)
 		assert.equal(manager.session, undefined)
 	} finally {
 		manager.dispose()
-		await rm(tempRoot, { recursive: true, force: true })
+		await removeTempRoot(tempRoot)
 	}
 })
 
@@ -243,7 +275,7 @@ test('helper manager refuses non-Windows platforms', async () => {
 		await assert.rejects(manager.warmup(), error => error.status === 501)
 	} finally {
 		manager.dispose()
-		await rm(tempRoot, { recursive: true, force: true })
+		await removeTempRoot(tempRoot)
 	}
 })
 
@@ -268,10 +300,10 @@ test('prepared helper is reused for a fast start and survives a stop', async () 
 		assert.equal(child.stdinLines.filter(line => line.includes('"show"')).length, 2)
 		await manager.stop(started.session, { dispose: true })
 		assert.equal(manager.session, undefined)
-		assert.equal(existsSync(path.join(tempRoot, started.session)), false)
+		assert.equal(await waitForRemoved(path.join(tempRoot, started.session)), true)
 	} finally {
 		manager.dispose()
-		await rm(tempRoot, { recursive: true, force: true })
+		await removeTempRoot(tempRoot)
 	}
 })
 
@@ -285,7 +317,7 @@ test('facts heartbeat reports the helper prepared state for the active clear', a
 		await manager.stop(started.session, { dispose: true })
 	} finally {
 		manager.dispose()
-		await rm(tempRoot, { recursive: true, force: true })
+		await removeTempRoot(tempRoot)
 	}
 })
 
@@ -326,7 +358,7 @@ test('non-ASCII labels are written to the helper as pure ASCII JSON escapes', as
 		await manager.stop(started.session, { dispose: true })
 	} finally {
 		manager.dispose()
-		await rm(tempRoot, { recursive: true, force: true })
+		await removeTempRoot(tempRoot)
 	}
 })
 
@@ -375,7 +407,7 @@ test('the prepared snapshot of the previous window is not reported after a show'
 		await manager.stop(prepared.session, { dispose: true })
 	} finally {
 		manager.dispose()
-		await rm(tempRoot, { recursive: true, force: true })
+		await removeTempRoot(tempRoot)
 	}
 })
 
@@ -392,7 +424,7 @@ test('a helper that never confirms the show fails the start instead of hiding th
 		assert.equal(manager.session, undefined)
 	} finally {
 		manager.dispose()
-		await rm(tempRoot, { recursive: true, force: true })
+		await removeTempRoot(tempRoot)
 	}
 })
 
@@ -410,12 +442,10 @@ test('sweep reclaims a prepared helper that stopped sending facts', async () => 
 		manager.sweep()
 		assert.equal(child.killed, true)
 		assert.equal(manager.session, undefined)
-		const deadline = Date.now() + 1000
-		while (existsSync(path.join(tempRoot, session.id)) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10))
-		assert.equal(existsSync(path.join(tempRoot, session.id)), false)
+		assert.equal(await waitForRemoved(path.join(tempRoot, session.id)), true)
 	} finally {
 		manager.dispose()
-		await rm(tempRoot, { recursive: true, force: true })
+		await removeTempRoot(tempRoot)
 	}
 })
 
@@ -431,7 +461,7 @@ test('concurrent prepare and start serialize into one helper', async () => {
 		await manager.stop(started.session, { dispose: true })
 	} finally {
 		manager.dispose()
-		await rm(tempRoot, { recursive: true, force: true })
+		await removeTempRoot(tempRoot)
 	}
 })
 
@@ -447,12 +477,10 @@ test('dispose current kills a helper whose stop did not dispose', async () => {
 		await manager.disposeSession()
 		assert.equal(child.killed, true)
 		assert.equal(manager.session, undefined)
-		const deadline = Date.now() + 1000
-		while (existsSync(path.join(tempRoot, prepared.id)) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10))
-		assert.equal(existsSync(path.join(tempRoot, prepared.id)), false)
+		assert.equal(await waitForRemoved(path.join(tempRoot, prepared.id)), true)
 	} finally {
 		manager.dispose()
-		await rm(tempRoot, { recursive: true, force: true })
+		await removeTempRoot(tempRoot)
 	}
 })
 
@@ -484,7 +512,7 @@ test('desktop routes expose capabilities and drive a fake helper', async () => {
 		assert.equal(typeof stopped.settings, 'object')
 	} finally {
 		manager.dispose()
-		await rm(tempRoot, { recursive: true, force: true })
+		await removeTempRoot(tempRoot)
 	}
 })
 
@@ -497,6 +525,6 @@ test('worker startup waits for ready and rejects a helper that exits early', asy
 		assert.equal(manager.session, undefined)
 	} finally {
 		manager.dispose()
-		await rm(tempRoot, { recursive: true, force: true })
+		await removeTempRoot(tempRoot)
 	}
 })

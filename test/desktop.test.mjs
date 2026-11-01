@@ -123,6 +123,36 @@ test('desktop model carries the shared timings, physics and menu labels', () => 
 	assert.equal(labels['menu.smartHide'], 'Smart Hide')
 })
 
+test('canvas color serialization parses both hex and rgb forms', () => {
+	// Canvas returns opaque colors as #rrggbb and translucent ones as rgba(...);
+	// parsing only the latter dropped the light theme's dark text colors.
+	const hex = t.normalizeDesktopSerializedColor('#0f1115')
+	assert.equal(hex.r, 15)
+	assert.equal(hex.g, 17)
+	assert.equal(hex.b, 21)
+	assert.equal(hex.a, 1)
+	const shortHex = t.normalizeDesktopSerializedColor('#FFF')
+	assert.equal(shortHex.r, 255)
+	assert.equal(shortHex.g, 255)
+	assert.equal(shortHex.b, 255)
+	const hexAlpha = t.normalizeDesktopSerializedColor('#f8f9fa94')
+	assert.equal(hexAlpha.r, 248)
+	assert.equal(hexAlpha.g, 249)
+	assert.equal(hexAlpha.b, 250)
+	assert.ok(Math.abs(hexAlpha.a - 148 / 255) < 1e-9)
+	const rgb = t.normalizeDesktopSerializedColor('rgb(255, 255, 255)')
+	assert.equal(rgb.r, 255)
+	assert.equal(rgb.a, 1)
+	const rgba = t.normalizeDesktopSerializedColor('rgba(38, 49, 72, 0.06)')
+	assert.equal(rgba.r, 38)
+	assert.equal(rgba.g, 49)
+	assert.equal(rgba.b, 72)
+	assert.equal(rgba.a, 0.06)
+	assert.equal(t.normalizeDesktopSerializedColor('#12345'), undefined)
+	assert.equal(t.normalizeDesktopSerializedColor('not-a-color'), undefined)
+	assert.equal(t.normalizeDesktopSerializedColor(undefined), undefined)
+})
+
 test('desktop preferences default off and normalize safely', () => {
 	const defaults = t.normalizeChatPetPrefs(undefined)
 	assert.equal(defaults.desktopDisplay, false)

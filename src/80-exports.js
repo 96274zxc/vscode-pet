@@ -205,5 +205,6 @@ const __test = {
 	ChatPetDesktopBridge,
 	getChatPetDesktopModel,
 	getChatPetDesktopMenuLabels,
+	normalizeDesktopSerializedColor,
 	renderChatPetDesktopPayload,
 }

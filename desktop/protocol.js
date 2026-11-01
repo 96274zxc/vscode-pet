@@ -156,16 +156,39 @@ function normalizeColor(value, fallback) {
 	return typeof value === 'string' && HEX_COLOR.test(value.trim()) ? value.trim() : fallback
 }
 
+// A theme arrives as one object; if a field is missing (an older client, or a
+// color the client could not parse) the default must still belong to the same
+// palette as `dark`, otherwise a light menu gets near-white labels.
+const DARK_THEME_DEFAULTS = {
+	menuBackground: '#26272b',
+	menuText: '#f2f3f5',
+	menuMuted: '#9a9ca3',
+	menuHover: '#3a3b40',
+	menuBorder: '#414248',
+	accent: '#4d6bfe',
+}
+
+const LIGHT_THEME_DEFAULTS = {
+	menuBackground: '#ffffff',
+	menuText: '#1f2329',
+	menuMuted: '#6b7280',
+	menuHover: '#f1f2f4',
+	menuBorder: '#e3e5e8',
+	accent: '#4d6bfe',
+}
+
 export function normalizeDesktopTheme(raw) {
 	const source = isRecord(raw) ? raw : {}
+	const dark = readBoolean(source.dark, true)
+	const defaults = dark ? DARK_THEME_DEFAULTS : LIGHT_THEME_DEFAULTS
 	return {
-		dark: readBoolean(source.dark, true),
-		menuBackground: normalizeColor(source.menuBackground, '#26272b'),
-		menuText: normalizeColor(source.menuText, '#f2f3f5'),
-		menuMuted: normalizeColor(source.menuMuted, '#9a9ca3'),
-		menuHover: normalizeColor(source.menuHover, '#3a3b40'),
-		menuBorder: normalizeColor(source.menuBorder, '#414248'),
-		accent: normalizeColor(source.accent, '#4d6bfe'),
+		dark,
+		menuBackground: normalizeColor(source.menuBackground, defaults.menuBackground),
+		menuText: normalizeColor(source.menuText, defaults.menuText),
+		menuMuted: normalizeColor(source.menuMuted, defaults.menuMuted),
+		menuHover: normalizeColor(source.menuHover, defaults.menuHover),
+		menuBorder: normalizeColor(source.menuBorder, defaults.menuBorder),
+		accent: normalizeColor(source.accent, defaults.accent),
 	}
 }
 

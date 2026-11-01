@@ -659,9 +659,18 @@ export class DesktopHelperManager {
 
 	async _removeDir(dir) {
 		if (!dir) return
-		try {
-			await this.fs.rm(dir, { recursive: true, force: true })
-		} catch (ignored) { /* best effort */ }
+		// Windows can refuse a recursive delete while an antivirus scanner or the
+		// shell thumbnail cache still holds a freshly written frame file open, so a
+		// transient EPERM must not leave the session directory behind.
+		for (let attempt = 0; attempt < 5; attempt++) {
+			try {
+				await this.fs.rm(dir, { recursive: true, force: true })
+				return
+			} catch (ignored) {
+				if (attempt === 4) return
+				await new Promise(resolve => setTimeout(resolve, 50))
+			}
+		}
 	}
 
 	async _writeBundle(dir, bundle, sessionId) {

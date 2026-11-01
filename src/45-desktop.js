@@ -248,18 +248,16 @@ let chatPetDesktopLabelsKey
 
 let chatPetDesktopThemeCanvas
 
-function normalizeDesktopThemeColor(value) {
-	if (typeof value !== 'string' || value.trim().length === 0) return undefined
-	try {
-		if (!chatPetDesktopThemeCanvas) chatPetDesktopThemeCanvas = document.createElement('canvas')
-		const context = chatPetDesktopThemeCanvas.getContext('2d')
-		if (!context) return undefined
-		context.fillStyle = '#000000'
-		context.fillStyle = value.trim()
-		const normalized = String(context.fillStyle)
-		const match = /^rgba?\(([^)]+)\)$/.exec(normalized)
-		if (!match) return undefined
-		const parts = match[1].split(',').map(part => Number(part.trim()))
+// Canvas serializes an opaque color as #rrggbb and a translucent one as
+// rgba(...). Parsing only the rgba form silently dropped every opaque theme
+// color (text, muted, accent), so a light menu ended up with the dark
+// palette's near-white labels while its background stayed white.
+function normalizeDesktopSerializedColor(normalized) {
+	if (typeof normalized !== 'string') return undefined
+	const text = normalized.trim()
+	const rgba = /^rgba?\(([^)]+)\)$/i.exec(text)
+	if (rgba) {
+		const parts = rgba[1].split(',').map(part => Number(part.trim()))
 		if (parts.length < 3 || !parts.slice(0, 3).every(Number.isFinite)) return undefined
 		return {
 			r: parts[0],
@@ -267,6 +265,36 @@ function normalizeDesktopThemeColor(value) {
 			b: parts[2],
 			a: parts.length > 3 && Number.isFinite(parts[3]) ? Math.max(0, Math.min(1, parts[3])) : 1,
 		}
+	}
+	const hex = /^#([0-9a-f]{3,8})$/i.exec(text)
+	if (!hex) return undefined
+	let digits = hex[1].toLowerCase()
+	if (digits.length === 3 || digits.length === 4) digits = digits.split('').map(channel => channel + channel).join('')
+	if (digits.length !== 6 && digits.length !== 8) return undefined
+	const channel = index => parseInt(digits.slice(index, index + 2), 16)
+	return {
+		r: channel(0),
+		g: channel(2),
+		b: channel(4),
+		a: digits.length === 8 ? channel(6) / 255 : 1,
+	}
+}
+
+const CHAT_PET_DESKTOP_INVALID_COLOR = '#010203'
+
+function normalizeDesktopThemeColor(value) {
+	if (typeof value !== 'string' || value.trim().length === 0) return undefined
+	try {
+		if (!chatPetDesktopThemeCanvas) chatPetDesktopThemeCanvas = document.createElement('canvas')
+		const context = chatPetDesktopThemeCanvas.getContext('2d')
+		if (!context) return undefined
+		context.fillStyle = CHAT_PET_DESKTOP_INVALID_COLOR
+		context.fillStyle = value.trim()
+		const normalized = String(context.fillStyle)
+		// An invalid value leaves the previous fillStyle in place; a real color
+		// that happens to equal the sentinel is not a theme color we care about.
+		if (normalized === CHAT_PET_DESKTOP_INVALID_COLOR) return undefined
+		return normalizeDesktopSerializedColor(normalized)
 	} catch (ignored) {
 		return undefined
 	}

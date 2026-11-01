@@ -150,6 +150,13 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   message as pure ASCII (`\uXXXX` escapes, decoded back to the original text by any reader) and the
   helper reads stdin as UTF-8 explicitly; an unparsable command is reported on stderr instead of
   being dropped silently.
+- 1.2.21 light-theme menu fix: the desktop theme reader normalized CSS colors through a canvas and
+  only parsed the `rgb()/rgba()` form, but Chromium serializes opaque colors as `#rrggbb`. Every
+  opaque theme color (menu text, muted/disabled text, accent) was silently dropped, the host filled
+  the missing fields with its dark-palette defaults, and the light menu drew near-white labels
+  (`#f2f3f5`) on the white background while only the disabled row stayed readable. The reader now
+  parses hex as well as rgb forms, and a partial theme falls back inside the palette selected by
+  `dark`, so a light menu can never inherit dark labels again.
 - The remaining helper footprint is the PowerShell 5.1 + .NET/WPF runtime itself; removing it would
   need a different helper host and is out of scope for the current implementation.
 
@@ -266,6 +273,10 @@ the helper to a prepared phase that `/facts` reports as `prepared: true` again.
 The 1.2.20 encoding fix was verified with a bundle carrying the Chinese menu labels: the same reuse
 show that had timed out after 8 s now acknowledges in 3–6 ms, and eight consecutive minimize/restore
 cycles on the real helper reused one prepared session (`showSeq` 1…6) without a single cold respawn.
+The 1.2.21 light menu was compared with the in-window menu on the same screen: enabled text is
+`#0F1115` in both, disabled text is `#81858C` in both, and the menu background differs by one unit
+(`#FBFCFC` desktop vs `#FAFBFB` in-window) because the desktop menu is opaque while the in-window
+menu is translucent over the page.
 The helper's geometry, physics and state-machine self-test runs in the test suite.
 
 
