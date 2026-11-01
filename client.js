@@ -381,6 +381,15 @@ const CHAT_PET_DEFAULT_RIGHT_INSET = 32
 const CHAT_PET_MIN_SCALE = 0.4
 const CHAT_PET_SCALE_STEP = 0.2
 const CHAT_PET_SPEECH_BUBBLE_RIGHT_OVERHANG = 20
+// The speech sprite is a 96px canvas whose visible bubble starts 30 source px
+// below its top; the 72px CSS canvas therefore has ~22.5px of transparent space
+// above the drawn bubble.
+const CHAT_PET_SPEECH_BUBBLE_SIZE = 72
+const CHAT_PET_SPEECH_BUBBLE_TOP = -32
+const CHAT_PET_SPEECH_BUBBLE_VISIBLE_TOP = 30 / CHAT_PET_SOURCE_SIZE
+const CHAT_PET_SPEECH_BUBBLE_TOP_INSET = CHAT_PET_SPEECH_BUBBLE_VISIBLE_TOP * CHAT_PET_SPEECH_BUBBLE_SIZE
+const CHAT_PET_SPEECH_BUBBLE_TOP_MIN = -42
+const CHAT_PET_SPEECH_BUBBLE_TOP_MAX = -25
 const CHAT_PET_SLEEP_RIGHT_OVERHANG = (CHAT_PET_SLEEP_SOURCE_WIDTH - CHAT_PET_SOURCE_SIZE) / 2
 const CHAT_PET_TYPING_RIGHT_OVERHANG = (CHAT_PET_TYPING_SOURCE_WIDTH - CHAT_PET_SOURCE_SIZE) / 2
 const CHAT_PET_PAINTING_RIGHT_OVERHANG = (CHAT_PET_PAINTING_SOURCE_WIDTH - CHAT_PET_SOURCE_SIZE) / 2
@@ -930,6 +939,17 @@ function getChatPetRelativeHorizontalPositionSafe(left, minimumLeft, maximumLeft
 
 function shouldPlaceChatPetSpeechBubbleLeft(state, buttonRight, inputRight, scale = 1) {
 	return state === 'rendering' && buttonRight + CHAT_PET_SPEECH_BUBBLE_RIGHT_OVERHANG * scale > inputRight
+}
+
+// The thinking bubble is drawn above the pet's head. The chat shows a thin
+// divider above the "深度求索" status row; the bubble should start exactly on that
+// line instead of floating above it. The sprite canvas has transparent rows on
+// top, so the visible top is CHAT_PET_SPEECH_BUBBLE_TOP_INSET below the
+// container's top. The clamp keeps the bubble attached to the pet when the
+// divider is out of reach (very large or very small scales).
+function getChatPetSpeechBubbleTop(buttonTop, dividerTop, scale = 1) {
+	const top = (dividerTop - buttonTop) / (scale > 0 ? scale : 1) - CHAT_PET_SPEECH_BUBBLE_TOP_INSET
+	return Math.max(CHAT_PET_SPEECH_BUBBLE_TOP_MIN, Math.min(CHAT_PET_SPEECH_BUBBLE_TOP_MAX, top))
 }
 
 function getChatPetWideSpriteHorizontalOffset(state, facingDirection, buttonLeft, buttonRight, inputLeft, inputRight, scale = 1) {
@@ -3894,6 +3914,28 @@ class ChatPetController {
 		}
 		const bubbleLeft = shouldPlaceChatPetSpeechBubbleLeft(this.renderedState, rect.right, input.right, this.scale)
 		this.button.classList.toggle('speech-bubble-left', bubbleLeft)
+		this._updateSpeechBubbleTop(rect)
+	}
+
+	// Align the visible top of the thinking bubble with the thin divider that
+	// DSH draws above the "深度求索" status row. Without it the bubble floats a few
+	// pixels above the line (the CSS position is relative to the pet only), and
+	// the offset depends on the window/font layout, so a fixed CSS value cannot
+	// land on the line everywhere.
+	_updateSpeechBubbleTop(buttonRect) {
+		const container = this.speechContainer
+		if (!container || !buttonRect || !(buttonRect.height > 0) || !(this.scale > 0)) return
+		let top
+		try {
+			const running = document.querySelector('[data-chat-running="true"]')
+			if (running) {
+				const divider = running.querySelector('[class*="runningDivider"]') || running
+				const rect = divider.getBoundingClientRect()
+				if (rect.width > 0 && rect.height >= 0) top = getChatPetSpeechBubbleTop(buttonRect.top, rect.top, this.scale)
+			}
+		} catch (ignored) { /* not running or no chat DOM: keep the CSS position */ }
+		if (top === undefined) container.style.removeProperty('top')
+		else container.style.top = `${top.toFixed(2)}px`
 	}
 
 	_updateSpeechBubble(state) {
@@ -6218,6 +6260,7 @@ const __test = {
 	getChatPetRespawnTop,
 	getChatPetWideSpriteHorizontalOffset,
 	shouldPlaceChatPetSpeechBubbleLeft,
+	getChatPetSpeechBubbleTop,
 	getChatPetFrameDurations,
 	getChatPetSpriteName,
 	doesChatPetStateTrackCursor,

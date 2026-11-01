@@ -31,6 +31,9 @@ Thanks to the VS Code team and the original Blobby authors for the character and
 
 - Sits on top of the composer and reacts to chat: pointer gaze, typing, thinking, clapping when the
   agent needs input, sleeping after 20 seconds, and the red-button celebration when a turn finishes.
+  While a turn runs, the thinking bubble's top is anchored to the thin divider above the
+  "深度求索" status row, so the dots start exactly on that line instead of floating above it; the
+  anchor is recomputed from the real divider whenever the chat, window or scale changes.
 - Drag it, flick it, throw it with `Shift+←/→`, hop with `←/→`, catch it while it falls, and watch
   the despawn/respawn portal sequence. While the DSH window is visible the composer card is its only
   perch: it spawns and respawns above that card, follows it when the window or input grows/shrinks,
@@ -173,6 +176,17 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   in-window pet) whether DSH is still visible and unobstructed, so clicking the desktop keeps Blobby
   in the window while a window that covers DSH still hands it over; the client re-probes every 600ms
   while DSH stays visible, and falls back to the old focus-based handoff when no helper can answer.
+- 1.2.23 thinking-bubble alignment: the speech bubble used to sit at a fixed CSS offset above the
+  pet, so while a turn ran its visible top floated a few pixels above the thin divider above the
+  "深度求索" status row (the offset changes with the window, font size and pet scale, so a fixed value
+  cannot land on the line everywhere). The widget now reads the real divider from the chat DOM
+  (`[data-chat-running]` + its divider span), converts the distance into the bubble's CSS coordinate
+  (accounting for the 30/96 transparent source rows and the pet scale) and keeps the visible top on
+  that line, with a clamp so a very large pet never drags the bubble into its face. It re-runs on
+  state changes, layout, scroll and resize; without a running row it falls back to the original CSS
+  position. At the default 48px size the bubble now starts exactly on the divider (measured 0.00px
+  offset); with the clamp, pets much larger than the composer gap keep a small overhang instead of
+  covering the eyes.
 - The remaining helper footprint is the PowerShell 5.1 + .NET/WPF runtime itself; removing it would
   need a different helper host and is out of scope for the current implementation.
 
@@ -300,6 +314,11 @@ menu click has no blank frame (1.2.21 lost the pet for one frame), the desktop h
 forwarded facts showed `hasInput:false` while hidden and `hasInput:true` while focused), and the
 probe reported `foreground`/`covered`/`iconic` correctly against a real Notepad window (beside DSH:
 uncovered; over the in-window pet: covered; DSH minimized: iconic).
+The 1.2.23 bubble anchor was measured in the live chat at the default size: with the pet resting at
+top 644 and the composer card at 692, the status divider sits at 637 and the bubble's visible top
+lands on 637 as well (0.00px offset; the screenshot's divider row and bubble top edge are the same
+row). The anchor is computed from the divider rect, so it follows a different window/font layout and
+re-runs on scroll/resize instead of assuming a fixed offset.
 The helper's geometry, physics and state-machine self-test runs in the test suite.
 
 

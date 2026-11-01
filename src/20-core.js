@@ -404,6 +404,17 @@ function shouldPlaceChatPetSpeechBubbleLeft(state, buttonRight, inputRight, scal
 	return state === 'rendering' && buttonRight + CHAT_PET_SPEECH_BUBBLE_RIGHT_OVERHANG * scale > inputRight
 }
 
+// The thinking bubble is drawn above the pet's head. The chat shows a thin
+// divider above the "深度求索" status row; the bubble should start exactly on that
+// line instead of floating above it. The sprite canvas has transparent rows on
+// top, so the visible top is CHAT_PET_SPEECH_BUBBLE_TOP_INSET below the
+// container's top. The clamp keeps the bubble attached to the pet when the
+// divider is out of reach (very large or very small scales).
+function getChatPetSpeechBubbleTop(buttonTop, dividerTop, scale = 1) {
+	const top = (dividerTop - buttonTop) / (scale > 0 ? scale : 1) - CHAT_PET_SPEECH_BUBBLE_TOP_INSET
+	return Math.max(CHAT_PET_SPEECH_BUBBLE_TOP_MIN, Math.min(CHAT_PET_SPEECH_BUBBLE_TOP_MAX, top))
+}
+
 function getChatPetWideSpriteHorizontalOffset(state, facingDirection, buttonLeft, buttonRight, inputLeft, inputRight, scale = 1) {
 	const overhang = state === 'sleep' || state === 'waking'
 		? CHAT_PET_SLEEP_RIGHT_OVERHANG

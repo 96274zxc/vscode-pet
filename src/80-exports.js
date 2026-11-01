@@ -178,6 +178,7 @@ const __test = {
 	getChatPetRespawnTop,
 	getChatPetWideSpriteHorizontalOffset,
 	shouldPlaceChatPetSpeechBubbleLeft,
+	getChatPetSpeechBubbleTop,
 	getChatPetFrameDurations,
 	getChatPetSpriteName,
 	doesChatPetStateTrackCursor,

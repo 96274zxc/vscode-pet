@@ -197,6 +197,22 @@ test('scale, horizontal position and wide sprites clamp exactly', () => {
 	assert.equal(t.getChatPetWideSpriteHorizontalOffset('typing', 'right', 700, 748, 100, 740, 1), -44)
 })
 
+test('the thinking bubble lands on the status divider across scales', () => {
+	// The bubble canvas has 30/96 transparent source rows on top; the CSS canvas
+	// is 72px, so the visible top is 22.5px below the container at scale 1.
+	const inset = 30 / 96 * 72
+	assert.equal(inset, 22.5)
+	// The pet rests at 644 and the divider is at 638: the bubble container must
+	// move 3.5px down from its CSS default (-32) to put the visible top on 638.
+	assert.equal(t.getChatPetSpeechBubbleTop(644, 638, 1), -28.5)
+	assert.equal(t.getChatPetSpeechBubbleTop(644, 638, 0.5), (638 - 644) / 0.5 - inset)
+	// A divider far above the reachable range keeps the bubble attached to the pet.
+	assert.equal(t.getChatPetSpeechBubbleTop(644, 400, 1), -42)
+	assert.equal(t.getChatPetSpeechBubbleTop(644, 800, 1), -25)
+	// A scale of zero must not divide by zero.
+	assert.ok(Number.isFinite(t.getChatPetSpeechBubbleTop(644, 638, 0)))
+})
+
 test('English and Chinese catalogs stay complete and in sync', () => {
 	const en = t.CHAT_PET_LOCALE.en
 	const zh = t.CHAT_PET_LOCALE.zh

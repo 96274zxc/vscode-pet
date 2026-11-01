@@ -801,6 +801,28 @@ class ChatPetController {
 		}
 		const bubbleLeft = shouldPlaceChatPetSpeechBubbleLeft(this.renderedState, rect.right, input.right, this.scale)
 		this.button.classList.toggle('speech-bubble-left', bubbleLeft)
+		this._updateSpeechBubbleTop(rect)
+	}
+
+	// Align the visible top of the thinking bubble with the thin divider that
+	// DSH draws above the "深度求索" status row. Without it the bubble floats a few
+	// pixels above the line (the CSS position is relative to the pet only), and
+	// the offset depends on the window/font layout, so a fixed CSS value cannot
+	// land on the line everywhere.
+	_updateSpeechBubbleTop(buttonRect) {
+		const container = this.speechContainer
+		if (!container || !buttonRect || !(buttonRect.height > 0) || !(this.scale > 0)) return
+		let top
+		try {
+			const running = document.querySelector('[data-chat-running="true"]')
+			if (running) {
+				const divider = running.querySelector('[class*="runningDivider"]') || running
+				const rect = divider.getBoundingClientRect()
+				if (rect.width > 0 && rect.height >= 0) top = getChatPetSpeechBubbleTop(buttonRect.top, rect.top, this.scale)
+			}
+		} catch (ignored) { /* not running or no chat DOM: keep the CSS position */ }
+		if (top === undefined) container.style.removeProperty('top')
+		else container.style.top = `${top.toFixed(2)}px`
 	}
 
 	_updateSpeechBubble(state) {
