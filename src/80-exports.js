@@ -202,6 +202,7 @@ const __test = {
 	getChatPetDesktopAnchoredLeft,
 	getChatPetDesktopHorizontalAnchor,
 	getChatPetDesktopFramePlan,
+	ChatPetDesktopBridge,
 	getChatPetDesktopModel,
 	getChatPetDesktopMenuLabels,
 	renderChatPetDesktopPayload,

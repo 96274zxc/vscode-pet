@@ -1820,6 +1820,7 @@ function releaseChatPetAccessoryImages(keepUrl) {
 const CHAT_PET_DESKTOP_PROTOCOL = 1
 const CHAT_PET_DESKTOP_ROUTE = '/api/blobby/desktop'
 const CHAT_PET_DESKTOP_START_DEBOUNCE = 250
+const CHAT_PET_DESKTOP_START_TIMEOUT = 15000
 const CHAT_PET_DESKTOP_MENU_LABEL_KEYS = [
 	'menu.hats', 'menu.playJump', 'menu.goOnTheRun', 'menu.comeBack',
 	'menu.grow', 'menu.shrink', 'menu.resetSize', 'menu.changeColor',
@@ -2480,17 +2481,30 @@ class ChatPetDesktopBridge {
 
 	async _request(path, options = {}) {
 		const init = { ...options }
+		delete init.timeout
 		if (init.body !== undefined) {
 			init.headers = { 'content-type': 'application/json', ...(init.headers ?? {}) }
 		}
-		const response = await fetch(`${CHAT_PET_DESKTOP_ROUTE}${path}`, init)
-		if (!response.ok) {
-			const error = new Error(`vscode-pet desktop route ${path} failed: ${response.status}`)
-			error.status = response.status
-			throw error
+		let timer
+		if (Number.isFinite(options.timeout) && typeof AbortController === 'function') {
+			const controller = new AbortController()
+			init.signal = controller.signal
+			timer = setTimeout(() => {
+				try { controller.abort() } catch (ignored) { /* noop */ }
+			}, Math.max(1, options.timeout))
 		}
-		const type = response.headers?.get?.('content-type') ?? ''
-		return type.includes('application/json') ? response.json() : response.text()
+		try {
+			const response = await fetch(`${CHAT_PET_DESKTOP_ROUTE}${path}`, init)
+			if (!response.ok) {
+				const error = new Error(`vscode-pet desktop route ${path} failed: ${response.status}`)
+				error.status = response.status
+				throw error
+			}
+			const type = response.headers?.get?.('content-type') ?? ''
+			return type.includes('application/json') ? response.json() : response.text()
+		} finally {
+			clearTimeout(timer)
+		}
 	}
 
 	async prewarm() {
@@ -2675,19 +2689,22 @@ class ChatPetDesktopBridge {
 		if (options.force !== true && typeof document !== 'undefined' && !document.hidden && document.hasFocus?.() === true) return
 		this._starting = true
 		const token = ++this._startToken
-		this.controller?.suspendForDesktop?.()
 		try {
 			const frames = await this._getFrames()
-			if (this.disposed || token !== this._startToken || !this.enabled) {
-				this.controller?.cancelDesktopSuspend?.()
-				return
-			}
+			if (this.disposed || token !== this._startToken || !this.enabled) return
 			const bundle = this._buildBundle(frames)
-			const response = await this._request('/start', { method: 'POST', body: JSON.stringify({ bundle }) })
+			const response = await this._request('/start', {
+				method: 'POST',
+				body: JSON.stringify({ bundle }),
+				timeout: CHAT_PET_DESKTOP_START_TIMEOUT,
+			})
 			if (this.disposed || token !== this._startToken) {
 				if (response?.session) this._request('/stop', { method: 'POST', body: JSON.stringify({ session: response.session, dispose: true }) }).catch(() => {})
 				return
 			}
+			// Suspend the in-window pet only after the helper actually showed, so a
+			// stalled/failed start can never leave the pet invisible everywhere.
+			this.controller?.suspendForDesktop?.()
 			this.active = true
 			this.session = response?.session
 			this._preparedSession = response?.session
@@ -2696,7 +2713,7 @@ class ChatPetDesktopBridge {
 			this._startPolling()
 			this.updateFacts({ running: this.controller?.running === true, pendingInteraction: this.controller?.pending === true })
 		} catch (error) {
-			this.controller?.cancelDesktopSuspend?.()
+			if (!this.active) this.controller?.cancelDesktopSuspend?.()
 			this.host?.status?.(this._translate('status.desktopError'))
 			console.warn('[vscode-pet] desktop display failed', error)
 		} finally {
@@ -2832,6 +2849,7 @@ class ChatPetDesktopBridge {
 			this._scheduleStart()
 		} else {
 			this._cancelScheduledStart()
+			if (this._starting) this._startToken += 1
 			if (this.active) this.stop({ returning: true })
 		}
 	}
@@ -2839,6 +2857,9 @@ class ChatPetDesktopBridge {
 	_onWindowFocus() {
 		if (this.disposed) return
 		this._cancelScheduledStart()
+		// A start that is still in flight must not hand off after DSH regained
+		// focus; invalidate it so its response is stopped instead of shown.
+		if (this._starting) this._startToken += 1
 		if (this.active) this.stop({ returning: true })
 	}
 
@@ -6048,6 +6069,7 @@ const __test = {
 	getChatPetDesktopAnchoredLeft,
 	getChatPetDesktopHorizontalAnchor,
 	getChatPetDesktopFramePlan,
+	ChatPetDesktopBridge,
 	getChatPetDesktopModel,
 	getChatPetDesktopMenuLabels,
 	renderChatPetDesktopPayload,
