@@ -118,19 +118,14 @@ function getChatPetColorPalette(color) {
 
 const coloredSpriteCache = new Map()
 let coloredSpritePixels = 0
-const MAX_CACHED_SPRITE_PIXELS = 1024 * 1024
+const MAX_CACHED_SPRITE_PIXELS = 2 * 1024 * 1024
 
 function getChatPetColoredSprite(image, color) {
 	if (isDefaultChatPetColor(color)) return image
 	const source = image.getAttribute('src')
 	const key = `${source}:${image.naturalWidth}x${image.naturalHeight}:${color}`
 	const cached = coloredSpriteCache.get(key)
-	if (cached) {
-		// Refresh the insertion order so the cache behaves as LRU, not FIFO.
-		coloredSpriteCache.delete(key)
-		coloredSpriteCache.set(key, cached)
-		return cached
-	}
+	if (cached) return cached
 	const canvas = document.createElement('canvas')
 	canvas.width = image.naturalWidth
 	canvas.height = image.naturalHeight

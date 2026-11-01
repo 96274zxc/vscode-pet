@@ -25,7 +25,7 @@ const DEFAULT_HELPER_SCRIPT = join(MODULE_DIR, 'blobby-desktop.ps1')
 const DEFAULT_TEMP_ROOT = join(tmpdir(), 'dsh-blobby-desktop')
 const START_READY_TIMEOUT = 60000
 const STOP_TIMEOUT = 12000
-const WARMUP_TIMEOUT = 15000
+const WARMUP_TIMEOUT = 60000
 const POLL_HOLD = 20000
 const HEARTBEAT_TIMEOUT = 5 * 60 * 1000
 const MAX_STDERR = 8000
@@ -79,15 +79,8 @@ export class DesktopHelperManager {
 		this.lastStop = undefined
 		this.disposed = false
 		this.warmupPromise = undefined
-		this._operation = Promise.resolve()
 		this._sweepTimer = setInterval(() => this.sweep(), 60000)
 		this._sweepTimer.unref?.()
-	}
-
-	_enqueue(task) {
-		const run = this._operation.then(() => task())
-		this._operation = run.then(() => undefined, () => undefined)
-		return run
 	}
 
 	get supported() {
@@ -124,12 +117,7 @@ export class DesktopHelperManager {
 			let stderr = ''
 			child.stderr?.on('data', chunk => { stderr = `${stderr}${String(chunk)}`.slice(-MAX_STDERR) })
 			const result = await waitForExit(child, WARMUP_TIMEOUT)
-			if (result.code !== 0) {
-				if (result.signal === 'timeout') {
-					try { child.kill?.() } catch (ignored) { /* already gone */ }
-				}
-				throw httpError(500, `desktop helper warmup failed: ${stderr.trim() || result.error?.message || result.code || result.signal}`)
-			}
+			if (result.code !== 0) throw httpError(500, `desktop helper warmup failed: ${stderr.trim() || result.error?.message || result.code || result.signal}`)
 			return { ok: true }
 		})().finally(() => { this.warmupPromise = undefined })
 		return this.warmupPromise
@@ -137,12 +125,10 @@ export class DesktopHelperManager {
 
 	async prepare(rawBundle) {
 		this._assertSupported()
-		return this._enqueue(async () => {
-			const bundle = validateDesktopBundle(rawBundle)
-			if (this._preparing) return this._preparing
-			this._preparing = this._prepareInternal(bundle).finally(() => { this._preparing = undefined })
-			return this._preparing
-		})
+		const bundle = validateDesktopBundle(rawBundle)
+		if (this._preparing) return this._preparing
+		this._preparing = this._prepareInternal(bundle).finally(() => { this._preparing = undefined })
+		return this._preparing
 	}
 
 	async _prepareInternal(bundle) {
@@ -162,33 +148,31 @@ export class DesktopHelperManager {
 
 	async start(rawBundle) {
 		this._assertSupported()
-		return this._enqueue(async () => {
-			const bundle = validateDesktopBundle(rawBundle)
-			// The warmup and prepare are prefetches: never let the actual show wait
-			// on them (a stuck warmup used to leave the auto handoff pending with the
-			// in-window pet suspended). The queue above already serialized them.
-			if (this._preparing) {
-				try { await this._preparing } catch (ignored) { /* fall back to a cold helper */ }
-			}
-			const current = this.session
-			if (current && !current.exited && current.prepared && !current.visible && current.frameKey === bundle.frameKey) {
-				current.settings = { ...bundle.settings, desktopDisplay: true }
-				current.facts = bundle.facts
-				current.prepared = false
-				current.visible = true
-				current.version += 1
-				current.lastPollAt = Date.now()
-				this._writeStdin(current, { type: 'show', settings: current.settings, facts: current.facts })
-				this._wakeWaiters(current)
-				return { session: current.id, version: current.version, settings: current.settings, protocol: DESKTOP_PROTOCOL }
-			}
-			await this._disposeCurrent()
-			const session = await this._spawn(bundle, false)
-			session.prepared = false
-			session.visible = true
-			session.frameKey = bundle.frameKey
-			return { session: session.id, version: session.version, settings: session.settings, protocol: DESKTOP_PROTOCOL }
-		})
+		const bundle = validateDesktopBundle(rawBundle)
+		if (this.warmupPromise) {
+			try { await this.warmupPromise } catch (ignored) { /* the real start reports its own failure */ }
+		}
+		if (this._preparing) {
+			try { await this._preparing } catch (ignored) { /* fall back to a cold helper */ }
+		}
+		const current = this.session
+		if (current && !current.exited && current.prepared && !current.visible && current.frameKey === bundle.frameKey) {
+			current.settings = { ...bundle.settings, desktopDisplay: true }
+			current.facts = bundle.facts
+			current.prepared = false
+			current.visible = true
+			current.version += 1
+			current.lastPollAt = Date.now()
+			this._writeStdin(current, { type: 'show', settings: current.settings, facts: current.facts })
+			this._wakeWaiters(current)
+			return { session: current.id, version: current.version, settings: current.settings, protocol: DESKTOP_PROTOCOL }
+		}
+		await this._disposeCurrent()
+		const session = await this._spawn(bundle, false)
+		session.prepared = false
+		session.visible = true
+		session.frameKey = bundle.frameKey
+		return { session: session.id, version: session.version, settings: session.settings, protocol: DESKTOP_PROTOCOL }
 	}
 
 	async _spawn(bundle, prepared) {
@@ -312,7 +296,6 @@ export class DesktopHelperManager {
 			session.settings = mergeDesktopSettings(session.settings, message.settings)
 			session.prepared = true
 			session.visible = false
-			session.hiddenReason = typeof message.reason === 'string' ? message.reason : undefined
 			session.version += 1
 			this._wakeWaiters(session)
 			const resolveHidden = session.resolveHidden
@@ -347,14 +330,12 @@ export class DesktopHelperManager {
 			sessionId: session.id,
 			settings: { ...session.settings, desktopDisplay: session.settings.desktopDisplay !== false },
 			command: session.command,
-			hiddenReason: session.hiddenReason,
 		}
 		session.resolveExit?.({
 			code,
 			signal,
 			settings: { ...session.settings, desktopDisplay: session.settings.desktopDisplay !== false },
 			command: session.command,
-			hiddenReason: session.hiddenReason,
 		})
 		session.resolveExit = undefined
 		this._wakeWaiters(session)
@@ -388,7 +369,6 @@ export class DesktopHelperManager {
 			version: session.version,
 			settings: { ...session.settings, desktopDisplay: session.settings.desktopDisplay !== false },
 			prepared: session.prepared === true,
-			...(session.hiddenReason ? { hiddenReason: session.hiddenReason } : {}),
 		}
 	}
 
@@ -463,13 +443,9 @@ export class DesktopHelperManager {
 		return false
 	}
 
-	stop(sessionId, options = {}) {
-		if (!sessionId) return Promise.reject(httpError(400, 'desktop session is required'))
-		if (!isDesktopSessionId(sessionId)) return Promise.reject(httpError(400, 'desktop session is invalid'))
-		return this._enqueue(() => this._stopInternal(sessionId, options))
-	}
-
-	async _stopInternal(sessionId, options = {}) {
+	async stop(sessionId, options = {}) {
+		if (!sessionId) throw httpError(400, 'desktop session is required')
+		if (!isDesktopSessionId(sessionId)) throw httpError(400, 'desktop session is invalid')
 		const session = this.session
 		if (!session || session.id !== sessionId) {
 			return this.lastStop && this.lastStop.sessionId === sessionId
@@ -526,23 +502,16 @@ export class DesktopHelperManager {
 		const session = this.session
 		if (!session) return
 		try {
-			await this._stopInternal(session.id, { dispose: true })
+			await this.stop(session.id, { dispose: true })
 		} catch (ignored) {
-			/* fall through to the hard cleanup below */
-		}
-		// A concurrent client stop may have made _stopInternal return that stop's
-		// non-dispose result, so make sure the session and its process are gone.
-		if (this.session === session) {
 			this._kill(session)
 			await this._cleanupSession(session)
 		}
 	}
 
-	disposeSession() {
-		return this._enqueue(async () => {
-			await this._disposeCurrent()
-			return { ok: true }
-		})
+	async disposeSession() {
+		if (this.session) await this._disposeCurrent()
+		return { ok: true }
 	}
 
 	_kill(session) {
@@ -629,12 +598,9 @@ export class DesktopHelperManager {
 	sweep() {
 		if (this.disposed) return
 		const session = this.session
-		if (!session) return
+		if (!session || session.prepared) return
 		if (Date.now() - session.lastPollAt > HEARTBEAT_TIMEOUT) {
-			// Prepared helpers are long-lived for a fast start; reclaim them too
-			// when the client page stops sending facts (crash/reload), otherwise a
-			// hidden PowerShell/WPF process and its temp frames leak forever.
-			this.logger.warn?.(`[vscode-pet:desktop] stopping an idle ${session.prepared ? 'prepared ' : ''}desktop helper`)
+			this.logger.warn?.('[vscode-pet:desktop] stopping an idle desktop helper')
 			this._kill(session)
 			this._cleanupSession(session)
 		}

@@ -9,57 +9,11 @@ function injectChatPetStyles() {
 	return () => style.remove()
 }
 
-function getChatPetMemorySnapshot() {
-	const controller = activeBlobbyController
-	const bridge = activeChatPetDesktopBridge
-	let heap
-	try {
-		const info = performance?.memory
-		if (info) heap = { used: info.usedJSHeapSize, total: info.totalJSHeapSize, limit: info.jsHeapSizeLimit }
-	} catch (ignored) { /* not chromium */ }
-	let dom = 0
-	try { dom = document.querySelectorAll('[class*="chat-pet-"]').length } catch (ignored) { /* noop */ }
-	let desktop
-	if (bridge) {
-		const snapshot = bridge.getSnapshot()
-		let framesBytes = 0
-		try { framesBytes = bridge._frames ? JSON.stringify(bridge._frames).length : 0 } catch (ignored) { /* noop */ }
-		desktop = { ...snapshot, framesBytes, preparedSession: bridge._preparedSession, frameKey: bridge._frameKey }
-	}
-	let jump
-	if (controller?._jumpGame) {
-		const game = controller._jumpGame
-		jump = { platforms: game.model?.platforms?.length, walls: game.model?.walls?.length, platformElements: game.platformElements?.size, wallElements: game.wallElements?.size }
-	}
-	return {
-		heap,
-		images: { loaded: chatPetLoadedImages.size, pending: chatPetImageCache.size, failed: chatPetImageFailures.size },
-		colored: { count: coloredSpriteCache.size, pixels: coloredSpritePixels },
-		desktop,
-		jump,
-		dom,
-		listeners: controller?._listeners?.length,
-		bridgeListeners: bridge?._listeners?.length,
-		timers: controller ? {
-			idle: Boolean(controller.idleTimer),
-			frame: Boolean(controller.frameTimer),
-			transient: Boolean(controller.transientTimer),
-			confirmation: Boolean(controller.confirmationTimer),
-			bounce: Boolean(controller.bounceTimer),
-			respawn: Boolean(controller.respawnTimer),
-			run: Boolean(controller._runTimer),
-			gazeRaf: controller._gazeRaf !== undefined,
-			preloadIdle: controller._preloadIdle !== undefined,
-		} : undefined,
-		observers: { resize: Boolean(controller?._resizeObserver), mutation: Boolean(controller?._mutationObserver) },
-	}
-}
-
 function installChatPetDebugApi() {
 	let enabled = false
 	try { enabled = new URLSearchParams(location.search).get('blobbyDebug') === '1' || localStorage.getItem(CHAT_PET_DEBUG_KEY) === '1' } catch (ignored) { /* noop */ }
-	if (!enabled) return undefined
-	const api = {
+	if (!enabled) return
+	window.__dshBlobby = {
 		getSnapshot: () => activeBlobbyController?.getSnapshot(),
 		setFacts: facts => activeBlobbyController?.setFacts(facts),
 		showState: state => activeBlobbyController?._showTransientState(state),
@@ -69,13 +23,8 @@ function installChatPetDebugApi() {
 		startDesktop: () => activeChatPetDesktopBridge?.start(),
 		stopDesktop: () => activeChatPetDesktopBridge?.stop(),
 		getDesktop: () => activeChatPetDesktopBridge?.getSnapshot(),
-		memory: () => getChatPetMemorySnapshot(),
 		get controller() { return activeBlobbyController },
 		get desktop() { return activeChatPetDesktopBridge },
-	}
-	window.__dshBlobby = api
-	return () => {
-		if (window.__dshBlobby === api) delete window.__dshBlobby
 	}
 }
 
@@ -202,7 +151,6 @@ const __test = {
 	getChatPetDesktopAnchoredLeft,
 	getChatPetDesktopHorizontalAnchor,
 	getChatPetDesktopFramePlan,
-	ChatPetDesktopBridge,
 	getChatPetDesktopModel,
 	getChatPetDesktopMenuLabels,
 	renderChatPetDesktopPayload,

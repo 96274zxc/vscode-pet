@@ -99,34 +99,6 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   with moving/crumbling platforms, wall bank shots, hop score and a persisted high score.
 - Reduced-motion support, keyboard access, and a live status region for screen readers.
 
-## Performance and memory
-
-- The desktop helper loads animation frames lazily: the prepared helper decodes only the idle,
-  blink and gaze overlays (7 of 140 frames, ~0.26 MB instead of 6.26 MB in the reference bundle),
-  and every other state/effect decodes its PNGs on first use. The same run dropped the prepared
-  helper from ~117.7 MB to ~103.2 MB working set (~119.5 MB to ~99.7 MB private).
-- Prepared helpers are reused for the instant desktop start while DSH is focused; a helper whose
-  client stops sending the 250ms facts heartbeat is reclaimed after five minutes, so a crashed or
-  reloaded page cannot leave a hidden PowerShell/WPF process and its temp frames behind. The host
-  serializes `prepare`/`start`/`stop`, the client bounds `/start` at 15 seconds, and the in-window
-  pet is suspended only after the helper reports the show, so a stalled warmup or prepare can no
-  longer leave Blobby invisible in both places; a start invalidated by DSH regaining focus is
-  stopped instead of shown.
-- Client images load on demand: only the worn hat is prefetched, the hats-panel previews load their
-  own accessory images and release the non-worn ones when the panel closes, and the colored-sprite
-  cache is capped at 1 MP with LRU eviction.
-- The desktop theme is cached (re-checked at most every two seconds) and the menu labels are cached
-  per locale revision; the 250ms facts message only carries `theme`/`labels` when they changed, and
-  the helper keeps the last values otherwise.
-- Desktop frame baking reuses one canvas per batch (the PNG payload is byte-identical), the jump
-  game prunes platforms/walls below the camera, and widget/slot/bridge teardown releases timers,
-  observers, the idle preload, the debug API and the frame caches.
-- Diagnostics: with `?blobbyDebug=1` (or `localStorage["dsh.vscode-pet.debug"]="1"`),
-  `window.__dshBlobby.memory()` reports the JS heap, image/colored cache sizes, desktop frame bytes
-  and timer/listener/DOM counts; the helper's `status.json` reports `frames: {loaded,total,bytes}`.
-- The remaining helper footprint is the PowerShell 5.1 + .NET/WPF runtime itself; removing it would
-  need a different helper host and is out of scope for the current implementation.
-
 ## Install in a DSH profile
 
 From the public npm package (after release):
@@ -234,5 +206,4 @@ DSH grab cursor captured at runtime (byte-identical icon/hotspot), the drag resi
 thinking bubble while a turn runs, a taskbar that stays clickable under the pet window, and a desktop
 context menu that appears at its final position without a flash.
 The helper's geometry, physics and state-machine self-test runs in the test suite.
-
 

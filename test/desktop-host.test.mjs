@@ -245,66 +245,6 @@ test('prepared helper is reused for a fast start and survives a stop', async () 
 	}
 })
 
-test('sweep reclaims a prepared helper that stopped sending facts', async () => {
-	const { manager, tempRoot } = await makeManager()
-	try {
-		await manager.prepare(makeBundle())
-		const session = manager.session
-		assert.equal(session.prepared, true)
-		session.lastPollAt = Date.now()
-		manager.sweep()
-		assert.ok(manager.session, 'a prepared helper with fresh heartbeats stays alive')
-		const child = session.child
-		session.lastPollAt = Date.now() - 6 * 60 * 1000
-		manager.sweep()
-		assert.equal(child.killed, true)
-		assert.equal(manager.session, undefined)
-		const deadline = Date.now() + 1000
-		while (existsSync(path.join(tempRoot, session.id)) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10))
-		assert.equal(existsSync(path.join(tempRoot, session.id)), false)
-	} finally {
-		manager.dispose()
-		await rm(tempRoot, { recursive: true, force: true })
-	}
-})
-
-test('concurrent prepare and start serialize into one helper', async () => {
-	const { manager, tempRoot, spawn } = await makeManager()
-	try {
-		const [prepared, started] = await Promise.all([manager.prepare(makeBundle()), manager.start(makeBundle())])
-		assert.equal(prepared.session, started.session)
-		assert.equal(spawn.spawned.length, 1)
-		assert.ok(spawn.spawned[0].args.includes('-Prepared'))
-		const child = spawn.spawned[0].child
-		assert.equal(child.stdinLines.filter(line => line.includes('"show"')).length, 1)
-		await manager.stop(started.session, { dispose: true })
-	} finally {
-		manager.dispose()
-		await rm(tempRoot, { recursive: true, force: true })
-	}
-})
-
-test('dispose current kills a helper whose stop did not dispose', async () => {
-	const { manager, tempRoot, spawn } = await makeManager()
-	try {
-		await manager.prepare(makeBundle())
-		const prepared = manager.session
-		assert.ok(prepared)
-		const child = spawn.spawned[0].child
-		await manager.stop(prepared.id, { dispose: false })
-		assert.equal(child.killed, false)
-		await manager.disposeSession()
-		assert.equal(child.killed, true)
-		assert.equal(manager.session, undefined)
-		const deadline = Date.now() + 1000
-		while (existsSync(path.join(tempRoot, prepared.id)) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10))
-		assert.equal(existsSync(path.join(tempRoot, prepared.id)), false)
-	} finally {
-		manager.dispose()
-		await rm(tempRoot, { recursive: true, force: true })
-	}
-})
-
 test('desktop routes expose capabilities and drive a fake helper', async () => {
 	const { manager, tempRoot } = await makeManager()
 	try {

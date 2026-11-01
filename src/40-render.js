@@ -431,25 +431,3 @@ function loadChatPetImage(url) {
 function getChatPetCachedImage(url) {
 	return chatPetLoadedImages.get(url)
 }
-
-function releaseChatPetAccessoryImages(keepUrl) {
-	const sources = new Set()
-	for (const accessory of Object.values(CHAT_PET_ACCESSORIES)) {
-		const source = getChatPetAccessoryImageSource(accessory)
-		if (!source?.url || source.url === keepUrl) continue
-		sources.add(source.url)
-		chatPetLoadedImages.delete(source.url)
-		chatPetImageCache.delete(source.url)
-		chatPetImageFailures.delete(source.url)
-	}
-	if (sources.size === 0) return
-	for (const [key, canvas] of coloredSpriteCache) {
-		let release = false
-		for (const source of sources) {
-			if (key.startsWith(`${source}:`)) { release = true; break }
-		}
-		if (!release) continue
-		coloredSpriteCache.delete(key)
-		coloredSpritePixels -= canvas.width * canvas.height
-	}
-}
