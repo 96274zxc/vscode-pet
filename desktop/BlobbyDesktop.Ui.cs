@@ -149,6 +149,9 @@ namespace BlobbyDesktop
 		[DllImport("kernel32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr GetModuleHandle(string name);
 		[DllImport("user32.dll")] public static extern IntPtr FindWindow(string className, string windowName);
 		[DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
+		[DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(POINT point);
+		[DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr hwnd, uint flags);
+		public const uint GA_ROOT = 2;
 
 		public static void EnableDpiAwareness()
 		{
@@ -542,11 +545,16 @@ namespace BlobbyDesktop
 
 		private bool _menuOpen;
 		private Native.RECT _menuDip;
-		private bool _menuWindowFixed;
-		private double _menuWindowLeft;
-		private double _menuWindowTop;
-		private double _menuWindowWidth;
-		private double _menuWindowHeight;
+		// The context menu lives in its own layered window. Keeping it out of the
+		// pet window means opening the menu never resizes or moves that window:
+		// a layered window resize recreates its surface and the DWM presents the
+		// old content at the new origin for one frame, which made the pet flash.
+		private Window _menuWindow;
+		private Canvas _menuCanvas;
+		private IntPtr _menuHwnd;
+		private HwndSource _menuSource;
+		private double _menuWidth = 232;
+		private double _menuHeight = 305;
 		private long _lastPeekAt;
 		private long _peekUntil;
 		private long _splatUntil;
@@ -593,6 +601,10 @@ namespace BlobbyDesktop
 			_state.OnTheRun = _settings.OnTheRun;
 			_state.ResetIdle(_startedAt, _model);
 			if (!_prepared) BeginStart();
+			// A helper spawned prepared waits hidden; without this the phase stayed
+			// Starting and the visible tick ran (portal/fall/restore checks) on a
+			// hidden window until a stop happened to flip it to Prepared.
+			else _phase = Phase.Prepared;
 			_timer = new DispatcherTimer(DispatcherPriority.Normal);
 			_timer.Interval = TimeSpan.FromMilliseconds(150);
 			_timer.Tick += delegate { Tick(); };
@@ -794,7 +806,6 @@ namespace BlobbyDesktop
 			_menuBorder.Effect = new DropShadowEffect { BlurRadius = 18, ShadowDepth = 2, Opacity = 0.35 };
 			_menuStack = new StackPanel();
 			_menuBorder.Child = _menuStack;
-			_canvas.Children.Add(_menuBorder);
 			_window.MouseLeftButtonDown += OnMouseLeftDown;
 			_window.MouseLeftButtonUp += OnMouseLeftUp;
 			_window.MouseMove += OnMouseMove;
@@ -806,6 +817,7 @@ namespace BlobbyDesktop
 			Native.StyleOverlayWindow(_hwnd);
 			_source = HwndSource.FromHwnd(_hwnd);
 			if (_source != null) _source.AddHook(WndProc);
+			BuildMenuWindow();
 			LayoutWindow(true);
 			if (!_prepared)
 			{
@@ -916,7 +928,6 @@ namespace BlobbyDesktop
 			if (!Native.GetCursorPos(out point)) return IntPtr.Zero;
 			double x = (point.X - _monitorPhysical.Left) / _dpiScale;
 			double y = (point.Y - _monitorPhysical.Top) / _dpiScale;
-			if (_menuOpen && x >= _menuDip.Left && x <= _menuDip.Right && y >= _menuDip.Top && y <= _menuDip.Bottom) return IntPtr.Zero;
 			if (!IsInsidePet(x, y)) return IntPtr.Zero;
 			if (_dragging && _dshGrabbingCursor != IntPtr.Zero) return _dshGrabbingCursor;
 			if (_dshGrabCursor != IntPtr.Zero) return _dshGrabCursor;
@@ -938,15 +949,6 @@ namespace BlobbyDesktop
 		private void LayoutWindow(bool force)
 		{
 			if (_window == null || _geometry == null) return;
-			if (_menuOpen && _menuWindowFixed)
-			{
-				_contentLeft = _menuWindowLeft;
-				_contentTop = _menuWindowTop;
-				_contentWidth = _menuWindowWidth;
-				_contentHeight = _menuWindowHeight;
-				if (force) PositionPetAndLayers();
-				return;
-			}
 			double padX = _padX;
 			double padTop = _padTop;
 			double baseLeft = _petLeft - padX;
@@ -958,13 +960,6 @@ namespace BlobbyDesktop
 			double top = baseTop;
 			double right = baseRight;
 			double bottom = baseBottom;
-			if (_menuOpen)
-			{
-				if (_menuDip.Left < left) left = _menuDip.Left;
-				if (_menuDip.Top < top) top = _menuDip.Top;
-				if (_menuDip.Right > right) right = _menuDip.Right;
-				if (_menuDip.Bottom > bottom) bottom = _menuDip.Bottom;
-			}
 			foreach (ConfettiParticle particle in _confetti)
 			{
 				if (particle.BurstX - 84 < left) left = particle.BurstX - 84;
@@ -1018,7 +1013,6 @@ namespace BlobbyDesktop
 			if (_bubbleImage != null && _bubbleImage.Visibility == Visibility.Visible) PositionBubble();
 			PositionBounceBadge();
 			PositionConfetti();
-			if (_menuOpen) PositionMenu();
 		}
 
 		private void PositionPetAndLayers()
@@ -1037,13 +1031,6 @@ namespace BlobbyDesktop
 			PositionBubble();
 			PositionBounceBadge();
 			PositionConfetti();
-			if (_menuOpen) PositionMenu();
-		}
-
-		private void PositionMenu()
-		{
-			Canvas.SetLeft(_menuBorder, _menuDip.Left - _contentLeft);
-			Canvas.SetTop(_menuBorder, _menuDip.Top - _contentTop);
 		}
 
 		private DesktopAnimation AnimationFor(string state)
@@ -1847,7 +1834,8 @@ namespace BlobbyDesktop
 			double y = position.Y + _contentTop;
 			if (_menuOpen)
 			{
-				if (x >= _menuDip.Left && x <= _menuDip.Right && y >= _menuDip.Top && y <= _menuDip.Bottom) return;
+				// The menu has its own window, so a click that reaches the pet is
+				// always outside the menu.
 				CloseMenu();
 			}
 			if (!IsInsidePet(x, y)) return;
@@ -2035,10 +2023,76 @@ namespace BlobbyDesktop
 
 		private void OpenMenu()
 		{
+			_menuOpen = true;
+			MeasureMenu();
+			ComputeMenuOrigin();
+			PositionMenuWindow();
+			if (!_menuWindow.IsVisible) _menuWindow.Show();
+			Native.SetTopmost(_menuHwnd, true);
+			_menuBorder.Visibility = Visibility.Visible;
+			InstallMouseHook();
+		}
+
+		private void BuildMenuWindow()
+		{
+			_menuWindow = new Window();
+			_menuWindow.WindowStyle = WindowStyle.None;
+			_menuWindow.AllowsTransparency = true;
+			_menuWindow.Background = Brushes.Transparent;
+			_menuWindow.ShowInTaskbar = false;
+			_menuWindow.ShowActivated = false;
+			_menuWindow.ResizeMode = ResizeMode.NoResize;
+			_menuWindow.WindowStartupLocation = WindowStartupLocation.Manual;
+			_menuWindow.SizeToContent = SizeToContent.Manual;
+			_menuWindow.Left = 0;
+			_menuWindow.Top = 0;
+			_menuWindow.Width = _menuWidth + MenuShadowPad * 2;
+			_menuWindow.Height = _menuHeight + MenuShadowPad * 2;
+			_menuWindow.Topmost = true;
+			_menuCanvas = new Canvas();
+			_menuCanvas.Background = Brushes.Transparent;
+			Canvas.SetLeft(_menuBorder, MenuShadowPad);
+			Canvas.SetTop(_menuBorder, MenuShadowPad);
+			_menuBorder.Width = _menuWidth;
+			_menuCanvas.Children.Add(_menuBorder);
+			_menuWindow.Content = _menuCanvas;
+			_menuHwnd = new WindowInteropHelper(_menuWindow).EnsureHandle();
+			Native.StyleOverlayWindow(_menuHwnd);
+			_menuSource = HwndSource.FromHwnd(_menuHwnd);
+			if (_menuSource != null) _menuSource.AddHook(MenuWndProc);
+			// Measure the real menu while the window is still hidden so the first
+			// open never has to resize it.
+			MeasureMenu();
+			// Warm the layered surface so the first Show is not visible as a flash.
+			_menuWindow.Opacity = 0;
+			_menuWindow.Show();
+			_menuWindow.Hide();
+			_menuWindow.Opacity = 1;
+		}
+
+		private const double MenuShadowPad = 24;
+
+		private void MeasureMenu()
+		{
 			BuildMenu();
-			_menuBorder.Measure(new Size(240, double.PositiveInfinity));
-			double width = 232;
-			double height = Math.Max(40, _menuBorder.DesiredSize.Height);
+			_menuBorder.Width = _menuWidth;
+			_menuBorder.Measure(new Size(_menuWidth, double.PositiveInfinity));
+			double height = Math.Max(40, Math.Round(_menuBorder.DesiredSize.Height));
+			if (Math.Abs(height - _menuHeight) > 0.01)
+			{
+				_menuHeight = height;
+				_menuWindow.Width = _menuWidth + MenuShadowPad * 2;
+				_menuWindow.Height = _menuHeight + MenuShadowPad * 2;
+			}
+			_menuCanvas.UpdateLayout();
+		}
+
+		// The menu opens above the pet (or below it when there is no room above),
+		// anchored to the pet's right edge and clamped to the work area.
+		private void ComputeMenuOrigin()
+		{
+			double width = _menuWidth;
+			double height = _menuHeight;
 			double petRight = _petLeft + _displaySize;
 			double left = petRight - width;
 			double top = _petTop - height - 8 * _settings.Scale;
@@ -2052,65 +2106,55 @@ namespace BlobbyDesktop
 			_menuDip.Top = (int)Math.Round(top);
 			_menuDip.Right = (int)Math.Round(left + width);
 			_menuDip.Bottom = (int)Math.Round(top + height);
-			_menuOpen = true;
-			_menuBorder.Width = width;
-			// Lock one window rect that already covers the pet at the maximum
-			// scale plus the menu. Growing/shrinking then only moves the pet
-			// inside that fixed window instead of resizing/moving the layered
-			// window on every click, which caused the menu to jitter.
-			LockMenuWindow();
-			_menuBorder.Measure(new Size(width, double.PositiveInfinity));
-			_canvas.UpdateLayout();
-			_menuBorder.Visibility = Visibility.Visible;
-			InstallMouseHook();
 		}
 
-		private void LockMenuWindow()
+		private void PositionMenuWindow()
 		{
-			DesktopAnimation animation = _currentAnimation ?? AnimationFor("idle");
-			double maxScale = 8;
-			double maxDisplay = _model.Sizes.Display * maxScale;
-			double frameWidth = animation == null ? maxDisplay : animation.Width / 2.0 * maxScale;
-			double frameHeight = animation == null ? maxDisplay : animation.Height / 2.0 * maxScale;
-			double maxPadX = Math.Max(0, frameWidth - maxDisplay) + maxDisplay * 0.5 + 8;
-			double maxPadTop = Math.Max(32 * maxScale, Math.Max(0, frameHeight - maxDisplay)) + maxDisplay * 0.5 + 8;
-			double maxPetLeft = Math.Max(_geometry.Left, Math.Min(_geometry.Right - maxDisplay, _petLeft));
-			double maxPetTop = _geometry.FloorY - maxDisplay;
-			double left = Math.Min(Math.Min(_petLeft - _padX, maxPetLeft - maxPadX), _menuDip.Left);
-			double top = Math.Min(Math.Min(_petTop - _padTop, maxPetTop - maxPadTop), _menuDip.Top);
-			double right = Math.Max(Math.Max(_petLeft + _displaySize + _padX, maxPetLeft + maxDisplay + maxPadX), _menuDip.Right);
-			double bottom = Math.Max(Math.Max(_petTop + _displaySize, maxPetTop + maxDisplay), _menuDip.Bottom);
-			_menuWindowLeft = Math.Round(left);
-			_menuWindowTop = Math.Round(top);
-			_menuWindowWidth = Math.Max(1, Math.Round(right - left));
-			_menuWindowHeight = Math.Max(1, Math.Round(bottom - top));
-			_menuWindowFixed = true;
-			_contentLeft = _menuWindowLeft;
-			_contentTop = _menuWindowTop;
-			_contentWidth = _menuWindowWidth;
-			_contentHeight = _menuWindowHeight;
-			_window.Width = _contentWidth;
-			_window.Height = _contentHeight;
-			int x = (int)Math.Round(_monitorPhysical.Left + _contentLeft * _dpiScale);
-			int y = (int)Math.Round(_monitorPhysical.Top + _contentTop * _dpiScale);
-			int pixelWidth = (int)Math.Round(_contentWidth * _dpiScale);
-			int pixelHeight = (int)Math.Round(_contentHeight * _dpiScale);
-			_lastWindowX = x;
-			_lastWindowY = y;
-			_lastWindowWidth = pixelWidth;
-			_lastWindowHeight = pixelHeight;
-			if (_hwnd != IntPtr.Zero) Native.PlaceWindow(_hwnd, x, y, pixelWidth, pixelHeight);
-			PositionPetAndLayers();
+			if (_menuWindow == null || _menuHwnd == IntPtr.Zero) return;
+			double left = _menuDip.Left - MenuShadowPad;
+			double top = _menuDip.Top - MenuShadowPad;
+			double width = (_menuDip.Right - _menuDip.Left) + MenuShadowPad * 2;
+			double height = (_menuDip.Bottom - _menuDip.Top) + MenuShadowPad * 2;
+			if (Math.Abs(_menuWindow.Width - width) > 0.01 || Math.Abs(_menuWindow.Height - height) > 0.01)
+			{
+				_menuWindow.Width = width;
+				_menuWindow.Height = height;
+			}
+			int x = (int)Math.Round(_monitorPhysical.Left + left * _dpiScale);
+			int y = (int)Math.Round(_monitorPhysical.Top + top * _dpiScale);
+			int pixelWidth = (int)Math.Round(width * _dpiScale);
+			int pixelHeight = (int)Math.Round(height * _dpiScale);
+			Native.PlaceWindow(_menuHwnd, x, y, pixelWidth, pixelHeight);
+		}
+
+		private IntPtr MenuWndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+		{
+			if (msg == Native.WM_MOUSEACTIVATE)
+			{
+				handled = true;
+				return new IntPtr(Native.MA_NOACTIVATE);
+			}
+			if (msg == Native.WM_NCHITTEST)
+			{
+				int packed = lParam.ToInt32();
+				int screenX = (short)(packed & 0xFFFF);
+				int screenY = (short)((packed >> 16) & 0xFFFF);
+				double x = (screenX - _monitorPhysical.Left) / _dpiScale;
+				double y = (screenY - _monitorPhysical.Top) / _dpiScale;
+				bool inside = x >= _menuDip.Left && x <= _menuDip.Right && y >= _menuDip.Top && y <= _menuDip.Bottom;
+				handled = true;
+				return new IntPtr(inside ? Native.HTCLIENT : Native.HTTRANSPARENT);
+			}
+			return IntPtr.Zero;
 		}
 
 		private void CloseMenu()
 		{
 			if (!_menuOpen) return;
 			_menuOpen = false;
-			_menuWindowFixed = false;
 			_menuBorder.Visibility = Visibility.Hidden;
+			if (_menuWindow != null && _menuWindow.IsVisible) _menuWindow.Hide();
 			UninstallMouseHook();
-			LayoutWindow(true);
 		}
 
 		private Brush Brush(Color color)
@@ -2256,18 +2300,13 @@ namespace BlobbyDesktop
 		private void RefreshMenuInPlace()
 		{
 			if (!_menuOpen || _menuBorder == null) return;
-			double width = Math.Max(200, _menuDip.Right - _menuDip.Left);
-			BuildMenu();
-			_menuBorder.Width = width;
-			_menuBorder.Measure(new Size(width, double.PositiveInfinity));
-			double height = Math.Max(40, _menuBorder.DesiredSize.Height);
-			_menuDip.Right = (int)Math.Round(_menuDip.Left + width);
-			_menuDip.Bottom = (int)Math.Round(_menuDip.Top + height);
+			// Keep the menu anchored where it opened: growing/shrinking the pet must
+			// not move the rows under the cursor between repeated clicks.
+			MeasureMenu();
+			_menuDip.Right = (int)Math.Round(_menuDip.Left + _menuWidth);
+			_menuDip.Bottom = (int)Math.Round(_menuDip.Top + _menuHeight);
+			PositionMenuWindow();
 			_menuBorder.Visibility = Visibility.Visible;
-			LayoutWindow(true);
-			// LayoutWindow re-applies the menu's canvas position; update the
-			// layout afterwards so the menu is arranged at that position.
-			_canvas.UpdateLayout();
 		}
 
 		private void ApplyMenuTheme()
@@ -2436,6 +2475,11 @@ namespace BlobbyDesktop
 				RequestStop(false, false, false, "host-stop");
 				return;
 			}
+			if (type == "probe")
+			{
+				EmitProbeResult(JsonRead.GetInt(message, "id", 0));
+				return;
+			}
 			if (type == "facts")
 			{
 				_facts.Apply(JsonRead.GetObject(message, "facts"));
@@ -2455,6 +2499,54 @@ namespace BlobbyDesktop
 				LayoutWindow(true);
 				return;
 			}
+		}
+
+		// Report whether DSH is visible and unobstructed so the client can keep the
+		// pet inside the window when the user only clicked the desktop. The sample
+		// point is the in-window pet: if another window (or the desktop) is on top
+		// there, the in-window pet would be hidden and the desktop copy is needed.
+		private void EmitProbeResult(long id)
+		{
+			_dshWindow = Native.FindDshWindow(_parentPid, null);
+			bool iconic = _dshWindow != IntPtr.Zero && Native.IsIconic(_dshWindow);
+			bool visible = _dshWindow != IntPtr.Zero && Native.IsWindowVisible(_dshWindow) && !iconic;
+			bool foreground = _dshWindow != IntPtr.Zero && IsDshForeground();
+			bool covered = false;
+			if (visible)
+			{
+				Native.POINT point = new Native.POINT();
+				bool hasPoint = false;
+				if (_facts.HasPetRect)
+				{
+					point.X = (int)Math.Round(_facts.PetLeft + _facts.PetWidth / 2.0);
+					point.Y = (int)Math.Round(_facts.PetTop + _facts.PetHeight / 2.0);
+					hasPoint = true;
+				}
+				else
+				{
+					Native.RECT rect;
+					if (Native.GetWindowRect(_dshWindow, out rect))
+					{
+						point.X = (rect.Left + rect.Right) / 2;
+						point.Y = (rect.Top + rect.Bottom) / 2;
+						hasPoint = true;
+					}
+				}
+				if (hasPoint)
+				{
+					IntPtr at = Native.WindowFromPoint(point);
+					IntPtr root = at == IntPtr.Zero ? IntPtr.Zero : Native.GetAncestor(at, Native.GA_ROOT);
+					covered = root != _dshWindow && root != _hwnd && root != _menuHwnd;
+				}
+			}
+			Dictionary<string, object> payload = new Dictionary<string, object>();
+			payload["type"] = "probe-result";
+			payload["id"] = id;
+			payload["visible"] = visible;
+			payload["iconic"] = iconic;
+			payload["foreground"] = foreground;
+			payload["covered"] = covered;
+			Program.Emit(payload);
 		}
 
 		private void ShowPrepared(Dictionary<string, object> settings, Dictionary<string, object> facts)
@@ -2653,6 +2745,27 @@ namespace BlobbyDesktop
 				}
 				_source = null;
 			}
+			if (_menuSource != null)
+			{
+				try
+				{
+					_menuSource.RemoveHook(MenuWndProc);
+				}
+				catch (Exception)
+				{
+				}
+				_menuSource = null;
+			}
+			if (_menuWindow != null)
+			{
+				try
+				{
+					_menuWindow.Hide();
+				}
+				catch (Exception)
+				{
+				}
+			}
 			UninstallMouseHook();
 		}
 
@@ -2694,7 +2807,6 @@ namespace BlobbyDesktop
 		{
 			double x = (screenX - _monitorPhysical.Left) / _dpiScale;
 			double y = (screenY - _monitorPhysical.Top) / _dpiScale;
-			if (_menuOpen && x >= _menuDip.Left && x <= _menuDip.Right && y >= _menuDip.Top && y <= _menuDip.Bottom) return true;
 			if (_phase == Phase.Starting || _phase == Phase.Stopping || _stopped) return false;
 			return IsInsidePet(x, y);
 		}
@@ -2824,11 +2936,13 @@ namespace BlobbyDesktop
 						{
 							string label = element == null ? null : element.Tag as string;
 							if (string.IsNullOrEmpty(label)) return;
-							Point position = element.TranslatePoint(new Point(0, 0), _canvas);
+							// The menu lives in its own window, so translate the row into
+							// the menu border and add the menu's screen position.
+							Point position = element.TranslatePoint(new Point(0, 0), _menuBorder);
 							Dictionary<string, object> item = new Dictionary<string, object>();
 							item["label"] = label;
-							item["left"] = _contentLeft + position.X;
-							item["top"] = _contentTop + position.Y;
+							item["left"] = _menuDip.Left + position.X;
+							item["top"] = _menuDip.Top + position.Y;
 							item["width"] = element.ActualWidth;
 							item["height"] = element.ActualHeight;
 							items.Add(item);

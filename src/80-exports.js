@@ -198,6 +198,8 @@ const __test = {
 	CHAT_PET_DESKTOP_PROTOCOL,
 	isChatPetDesktopPlatform,
 	isChatPetDesktopSupported,
+	isChatPetDocumentFocused,
+	shouldSyncChatPetDesktopInput,
 	getChatPetDesktopGeometry,
 	getChatPetDesktopAnchoredLeft,
 	getChatPetDesktopHorizontalAnchor,

@@ -64,6 +64,7 @@ class FakeChild extends EventEmitter {
 		this.holdShow = false
 		this.pendingShow = false
 		this.showSeq = 0
+		this.answerProbes = true
 		this.stdin = {
 			writable: true,
 			write: line => {
@@ -74,6 +75,14 @@ class FakeChild extends EventEmitter {
 					if (message && Number.isFinite(message.showSeq)) this.showSeq = message.showSeq
 					if (this.holdShow) this.pendingShow = true
 					else this.ackShow()
+				}
+				if (line.includes('"probe"')) {
+					let message
+					try { message = JSON.parse(line) } catch (ignored) { message = undefined }
+					if (message && this.answerProbes) {
+						const payload = { type: 'probe-result', id: message.id, visible: true, iconic: false, foreground: false, covered: false }
+						setImmediate(() => this.stdout.write(`${JSON.stringify(payload)}\n`))
+					}
 				}
 				if (line.includes('"stop"')) {
 					if (line.includes('"dispose":true')) setImmediate(() => this.emit('exit', 0, null))
@@ -315,6 +324,37 @@ test('facts heartbeat reports the helper prepared state for the active clear', a
 		const started = await manager.start(makeBundle())
 		assert.equal((await manager.facts(started.session, { running: false })).prepared, false)
 		await manager.stop(started.session, { dispose: true })
+	} finally {
+		manager.dispose()
+		await removeTempRoot(tempRoot)
+	}
+})
+
+test('window probe asks the helper whether DSH is visible and uncovered', async () => {
+	const { manager, tempRoot, spawn } = await makeManager({ probeTimeout: 150 })
+	try {
+		const prepared = await manager.prepare(makeBundle())
+		const routes = createDesktopRoutes(manager)
+		const probeRoute = routes.find(route => route.path.endsWith('/probe'))
+		const response = await probeRoute.fetch(new Request('http://127.0.0.1/api/blobby/desktop/probe', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ session: prepared.session }),
+		}))
+		assert.equal(response.status, 200)
+		const probed = await response.json()
+		assert.equal(probed.ok, true)
+		assert.equal(probed.visible, true)
+		assert.equal(probed.iconic, false)
+		assert.equal(probed.foreground, false)
+		assert.equal(probed.covered, false)
+		const child = spawn.spawned[0].child
+		assert.ok(child.stdinLines.some(line => line.includes('"probe"')))
+		// A helper that stops answering fails the probe instead of hanging the
+		// client's blur handler.
+		child.answerProbes = false
+		await assert.rejects(manager.probe(prepared.session), error => error.status === 504)
+		await manager.stop(prepared.session, { dispose: true })
 	} finally {
 		manager.dispose()
 		await removeTempRoot(tempRoot)

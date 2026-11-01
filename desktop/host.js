@@ -25,6 +25,7 @@ const DEFAULT_HELPER_SCRIPT = join(MODULE_DIR, 'blobby-desktop.ps1')
 const DEFAULT_TEMP_ROOT = join(tmpdir(), 'dsh-blobby-desktop')
 const START_READY_TIMEOUT = 60000
 const SHOW_ACK_TIMEOUT = 8000
+const PROBE_TIMEOUT = 1200
 const STOP_TIMEOUT = 12000
 const WARMUP_TIMEOUT = 15000
 const POLL_HOLD = 20000
@@ -86,12 +87,14 @@ export class DesktopHelperManager {
 		this.powershell = options.powershell ?? 'powershell.exe'
 		this.parentPid = options.parentPid ?? process.ppid
 		this.showAckTimeout = options.showAckTimeout ?? SHOW_ACK_TIMEOUT
+		this.probeTimeout = options.probeTimeout ?? PROBE_TIMEOUT
 		this.logger = options.logger ?? { warn: (...args) => console.warn(...args), error: (...args) => console.error(...args) }
 		this.onEvent = options.onEvent
 		this.session = undefined
 		this.lastStop = undefined
 		this.disposed = false
 		this.warmupPromise = undefined
+		this._probeSeq = 0
 		this._operation = Promise.resolve()
 		this._sweepTimer = setInterval(() => this.sweep(), 60000)
 		this._sweepTimer.unref?.()
@@ -247,6 +250,7 @@ export class DesktopHelperManager {
 			visible: prepared !== true,
 			version: 0,
 			showSeq: 0,
+			probes: new Map(),
 			command: undefined,
 			lastPollAt: Date.now(),
 			waiters: [],
@@ -367,6 +371,14 @@ export class DesktopHelperManager {
 			if (message.settings) session.settings = mergeDesktopSettings(session.settings, message.settings)
 			session.version += 1
 			this._wakeWaiters(session)
+			return
+		}
+		if (message.type === 'probe-result') {
+			const waiter = session.probes?.get(message.id)
+			if (waiter) {
+				session.probes.delete(message.id)
+				try { waiter(message) } catch (ignored) { /* isolation */ }
+			}
 			return
 		}
 		if (message.type === 'error') {
@@ -548,6 +560,39 @@ export class DesktopHelperManager {
 		const status = await this._statusSnapshot(session)
 		const prepared = status ? status.phase === 'prepared' : session.prepared === true
 		return { ok: true, prepared, ...(status ? { phase: status.phase } : {}) }
+	}
+
+	// Ask the prepared helper whether DSH is still visible and unobstructed, so
+	// the client can keep the pet inside the window when the user merely clicked
+	// the desktop instead of moving the pet out. Only the native helper can see
+	// the Win32 z-order, hence the round trip.
+	async probe(sessionId) {
+		const session = this._requireSession(sessionId)
+		if (session.exited) throw httpError(410, 'desktop session is no longer active')
+		session.lastPollAt = Date.now()
+		const id = ++this._probeSeq
+		const result = await new Promise(resolve => {
+			let settled = false
+			const finish = value => {
+				if (settled) return
+				settled = true
+				clearTimeout(timer)
+				session.probes.delete(id)
+				resolve(value)
+			}
+			const timer = setTimeout(() => finish(undefined), this.probeTimeout)
+			timer.unref?.()
+			session.probes.set(id, finish)
+			if (!this._writeStdin(session, { type: 'probe', id })) finish(undefined)
+		})
+		if (!result) throw httpError(504, 'desktop helper did not answer the window probe')
+		return {
+			ok: true,
+			visible: result.visible === true,
+			iconic: result.iconic === true,
+			foreground: result.foreground === true,
+			covered: result.covered === true,
+		}
 	}
 
 	_writeStdin(session, value) {
@@ -852,6 +897,16 @@ export function createDesktopRoutes(manager) {
 				const body = await readJsonBody(request)
 				if (!body || typeof body !== 'object') throw httpError(400, 'desktop facts are required')
 				return jsonResponse(await manager.facts(String(body.session ?? ''), body.facts))
+			}),
+		},
+		{
+			path: `${DESKTOP_ROUTE}/probe`,
+			methods: ['POST'],
+			requestBody: 'buffered',
+			fetch: wrap(async request => {
+				const body = await readJsonBody(request)
+				if (!body || typeof body !== 'object' || !body.session) throw httpError(400, 'desktop session is required')
+				return jsonResponse(await manager.probe(String(body.session)))
 			}),
 		},
 		{

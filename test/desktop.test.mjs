@@ -153,6 +153,17 @@ test('canvas color serialization parses both hex and rgb forms', () => {
 	assert.equal(t.normalizeDesktopSerializedColor(undefined), undefined)
 })
 
+test('desktop typing facts require a focused document', () => {
+	assert.equal(t.shouldSyncChatPetDesktopInput({ hasInput: true }, true), true)
+	assert.equal(t.shouldSyncChatPetDesktopInput({ hasInput: true }, false), false)
+	assert.equal(t.shouldSyncChatPetDesktopInput({ hasInput: false }, true), false)
+	assert.equal(t.shouldSyncChatPetDesktopInput(undefined, true), false)
+	assert.equal(t.isChatPetDocumentFocused({ hasFocus: () => true }), true)
+	assert.equal(t.isChatPetDocumentFocused({ hasFocus: () => false }), false)
+	assert.equal(t.isChatPetDocumentFocused({}), true)
+	assert.equal(t.isChatPetDocumentFocused(undefined), true)
+})
+
 test('desktop preferences default off and normalize safely', () => {
 	const defaults = t.normalizeChatPetPrefs(undefined)
 	assert.equal(defaults.desktopDisplay, false)

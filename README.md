@@ -39,9 +39,12 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   auto-hidden) is the floor.
 - **Desktop display (Windows desktop app only)**: the pet's context menu gains a checkable
   **Show on Desktop** item, with **Smart Hide** directly below it once enabled. While DSH is active
-  the native helper waits prepared, so as soon as DSH is minimized **or loses focus to another
-  window** Blobby moves to the desktop through the official respawn portal and lands above the taskbar
-  at the bottom-right; focusing DSH again plays the portal/fall return inside the window. Double-click
+  the native helper waits prepared. When DSH is minimized/hidden, or another window covers it,
+  Blobby moves to the desktop through the official respawn portal and lands above the taskbar at the
+  bottom-right. A mere focus loss is not enough: while DSH is still visible and unobstructed (the
+  user clicked the desktop or a window beside it) the pet stays in the window, and the client
+  re-probes the window every 600ms so it still steps out once another window covers DSH. Focusing
+  DSH again plays the portal/fall return inside the window. Double-click
   the desktop pet to bring the DSH window back. The desktop right-click menu mirrors the DSH menu:
   Hats, Change Color and Play Jump Game restore DSH and open the existing panels/game, while Go on the
   Run, size controls, Show on Desktop and Smart Hide work on the desktop itself. Throws always land
@@ -49,9 +52,10 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   taskbar and only the pet/menu accept clicks, so the taskbar and windows underneath stay usable; the
   menu is positioned before it is shown and keeps its size rows open for repeated clicks, its size
   labels align to the outer edges of their halves like the in-window menu, and it follows the DSH
-  light/dark palette and current UI language. While the menu is open the helper locks a single window
-  rect that already covers the pet at the maximum scale and the menu, so growing/shrinking never
-  moves or resizes the layered window and the menu cannot jitter. The helper renders on the
+  light/dark palette and current UI language. The menu lives in its own layered window, so opening it
+  never resizes or moves the pet window (resizing that layered window used to blank the pet for a
+  frame), and it stays anchored where it opened while the size rows grow or shrink the pet. The
+  helper renders on the
   composition loop with subpixel
   position compensation and no per-frame topmost churn, so its motion matches the in-window pet
   instead of sliding on the window's pixel grid. It also adopts the exact grab cursor used by DSH by
@@ -59,8 +63,10 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   drag-resistance wobble and the crossed-out (X) eyes while the pet is held (the same eye-overlay
   geometry as the in-window CSS, baked into the frames at the matching size). Chat reactions stay in
   sync on the desktop (the thinking bubble appears
-  while a turn is running). The desktop state machine also mirrors the window: typing while the
-  composer has input, waking when facts wake it, **buttonPress** when a request completes (silent
+  while a turn is running). Typing is deliberately not mirrored: the input facts are only forwarded
+  while the DSH document has focus, so text left in the composer never makes the desktop pet type
+  along. The desktop state machine also mirrors the window: waking when facts wake it, **buttonPress**
+  when a request completes (silent
   when cancelled), dizzy after quick cursor wiggles beside the pet (recorded from the idle facing
   changes within a 240px radius, first direction not counted, 8 changes/600ms like the window),
   reduced-motion variants, and eyes during the
@@ -157,6 +163,16 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   (`#f2f3f5`) on the white background while only the disabled row stayed readable. The reader now
   parses hex as well as rgb forms, and a partial theme falls back inside the palette selected by
   `dark`, so a light menu can never inherit dark labels again.
+- 1.2.22 desktop polish: the context menu moved into its own layered window, so opening it never
+  resizes or moves the pet window (a layered-window resize recreated its surface and showed the old
+  content at the new origin for one frame, which flashed the pet), and the menu stays anchored where
+  it opened while the size rows grow or shrink the pet. Typing is no longer mirrored to the desktop:
+  the input facts are only forwarded while the DSH document has focus, because typing in the
+  composer requires that focus. Focus loss alone also no longer sends the pet to the desktop: the
+  new `/api/blobby/desktop/probe` route asks the prepared helper (Win32 `WindowFromPoint` at the
+  in-window pet) whether DSH is still visible and unobstructed, so clicking the desktop keeps Blobby
+  in the window while a window that covers DSH still hands it over; the client re-probes every 600ms
+  while DSH stays visible, and falls back to the old focus-based handoff when no helper can answer.
 - The remaining helper footprint is the PowerShell 5.1 + .NET/WPF runtime itself; removing it would
   need a different helper host and is out of scope for the current implementation.
 
@@ -219,7 +235,8 @@ app.
 | `/vscode-pet` | Show/hide Blobby (keeps the plugin installed) |
 | Right-click → **Show on Desktop** | Windows desktop app only: move Blobby to the desktop while DSH is minimized or unfocused (✓ when enabled) |
 | Right-click → **Smart Hide** | Windows desktop app only: show the desktop pet on the desktop only, never above other apps |
-| Alt+Tab / click another window / minimize | Windows desktop app only: move Blobby to the desktop above the other window |
+| Alt+Tab to a window that covers DSH / minimize | Windows desktop app only: move Blobby to the desktop above the other window |
+| Click the desktop or a window beside DSH | Windows desktop app only: DSH stays visible and unobstructed, so Blobby stays in the window |
 | Focus the DSH window | Windows desktop app only: return Blobby into the DSH window |
 | Double-click the desktop pet | Bring the DSH window back |
 
@@ -277,6 +294,12 @@ The 1.2.21 light menu was compared with the in-window menu on the same screen: e
 `#0F1115` in both, disabled text is `#81858C` in both, and the menu background differs by one unit
 (`#FBFCFC` desktop vs `#FAFBFB` in-window) because the desktop menu is opaque while the in-window
 menu is translucent over the page.
+The 1.2.22 changes were verified on the real desktop: a ~15ms burst capture of the pet around the
+menu click has no blank frame (1.2.21 lost the pet for one frame), the desktop helper stays on
+`idle`/`rendering` instead of `typing` while the composer holds text and DSH is minimized (the
+forwarded facts showed `hasInput:false` while hidden and `hasInput:true` while focused), and the
+probe reported `foreground`/`covered`/`iconic` correctly against a real Notepad window (beside DSH:
+uncovered; over the in-window pet: covered; DSH minimized: iconic).
 The helper's geometry, physics and state-machine self-test runs in the test suite.
 
 

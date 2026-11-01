@@ -5,6 +5,8 @@ const CHAT_PET_DESKTOP_ROUTE = '/api/blobby/desktop'
 const CHAT_PET_DESKTOP_START_DEBOUNCE = 250
 const CHAT_PET_DESKTOP_START_TIMEOUT = 15000
 const CHAT_PET_DESKTOP_POLL_TIMEOUT = 5000
+const CHAT_PET_DESKTOP_PROBE_TIMEOUT = 2500
+const CHAT_PET_DESKTOP_MONITOR_INTERVAL = 600
 const CHAT_PET_DESKTOP_MENU_LABEL_KEYS = [
 	'menu.hats', 'menu.playJump', 'menu.goOnTheRun', 'menu.comeBack',
 	'menu.grow', 'menu.shrink', 'menu.resetSize', 'menu.changeColor',
@@ -40,6 +42,19 @@ function isChatPetDesktopSupported(options = {}) {
 	const platform = options.platform !== undefined ? options.platform : getChatPetDesktopPlatform()
 	const desktopApp = options.desktopApp !== undefined ? options.desktopApp : hasChatPetDesktopAppBridge(options.window)
 	return isChatPetDesktopPlatform(platform) && desktopApp === true
+}
+
+function isChatPetDocumentFocused(target = typeof document === 'undefined' ? undefined : document) {
+	try {
+		if (!target) return true
+		return typeof target.hasFocus !== 'function' ? true : target.hasFocus() === true
+	} catch (ignored) {
+		return true
+	}
+}
+
+function shouldSyncChatPetDesktopInput(controller, focused) {
+	return focused === true && controller?.hasInput === true
 }
 
 /* --------------------------------------------------------------- geometry */
@@ -626,6 +641,8 @@ class ChatPetDesktopBridge {
 		this._prepareKey = undefined
 		this._preparedSession = undefined
 		this._factsTimer = undefined
+		this._handoffTimer = undefined
+		this._probingHandoff = false
 		this._listeners = []
 		this._onVisibilityChange = this._onVisibilityChange.bind(this)
 		this._onWindowFocus = this._onWindowFocus.bind(this)
@@ -787,7 +804,11 @@ class ChatPetDesktopBridge {
 		const facts = {
 			running: this.controller?.running === true,
 			pendingInteraction: this.controller?.pending === true,
-			hasInput: this.controller?.hasInput === true,
+			// Typing is a reaction to typing in the conversation composer. The
+			// desktop pet only exists while DSH is unfocused, so the input state is
+			// only forwarded while the document actually has focus; otherwise the
+			// text left in the composer made the desktop pet type along.
+			hasInput: shouldSyncChatPetDesktopInput(this.controller, isChatPetDocumentFocused()),
 			canceled: this.controller?.canceled === true,
 			inputRevision: Number.isFinite(this.controller?.inputRevision) ? this.controller.inputRevision : 0,
 			grabbing: this.controller?.dragging === true,
@@ -913,7 +934,7 @@ class ChatPetDesktopBridge {
 		clearTimeout(this._startTimer)
 		this._startTimer = setTimeout(() => {
 			this._startTimer = undefined
-			this.start()
+			this._requestHandoff()
 		}, CHAT_PET_DESKTOP_START_DEBOUNCE)
 	}
 
@@ -922,10 +943,87 @@ class ChatPetDesktopBridge {
 		this._startTimer = undefined
 	}
 
+	// Focus loss alone does not mean the pet belongs on the desktop: if the DSH
+	// window is still visible and unobstructed (the user just clicked the desktop
+	// or another window beside it) the in-window pet stays where it is. The
+	// native helper owns the Win32 window probe because only it can tell whether
+	// another window now covers the pet.
+	async _requestHandoff() {
+		if (this.disposed || this.active || this._starting) return
+		if (!this.supported || !this.enabled || this.prefs.get().visible === false) return
+		if (document?.hidden !== true && isChatPetDocumentFocused()) {
+			this._stopHandoffMonitor()
+			return
+		}
+		const decision = await this._handoffDecision()
+		if (this.disposed || this.active || this._starting) return
+		if (decision === true) {
+			this._stopHandoffMonitor()
+			this.start()
+			return
+		}
+		if (decision === 'stay') this._startHandoffMonitor()
+	}
+
+	async _handoffDecision() {
+		if (typeof document !== 'undefined' && document.hidden) return true
+		const session = this._preparedSession
+		if (!session) return true
+		if (this._probingHandoff) return false
+		this._probingHandoff = true
+		try {
+			const result = await this._request('/probe', {
+				method: 'POST',
+				body: JSON.stringify({ session }),
+				timeout: CHAT_PET_DESKTOP_PROBE_TIMEOUT,
+			})
+			if (!result || result.ok !== true) return true
+			if (result.foreground === true) return 'skip'
+			if (result.iconic === true || result.visible === false) return true
+			if (result.covered === true) return true
+			return 'stay'
+		} catch (ignored) {
+			// No prepared helper to answer: keep the old focus-based handoff.
+			return true
+		} finally {
+			this._probingHandoff = false
+		}
+	}
+
+	_startHandoffMonitor() {
+		if (this._handoffTimer || this.disposed) return
+		this._handoffTimer = setInterval(() => { this._checkHandoff() }, CHAT_PET_DESKTOP_MONITOR_INTERVAL)
+	}
+
+	async _checkHandoff() {
+		if (this.disposed) { this._stopHandoffMonitor(); return }
+		if (this.active || this._starting) { this._stopHandoffMonitor(); return }
+		if (typeof document !== 'undefined' && document.hidden) {
+			this._stopHandoffMonitor()
+			this.start()
+			return
+		}
+		if (isChatPetDocumentFocused()) { this._stopHandoffMonitor(); return }
+		const decision = await this._handoffDecision()
+		if (this.disposed || this.active) return
+		if (decision === true) {
+			this._stopHandoffMonitor()
+			this.start()
+		} else if (decision === 'skip') {
+			this._stopHandoffMonitor()
+		}
+	}
+
+	_stopHandoffMonitor() {
+		clearInterval(this._handoffTimer)
+		this._handoffTimer = undefined
+	}
+
 	async start(options = {}) {
 		if (this.disposed || this.active || this._starting) return
 		if (!this.supported || !this.enabled || this.prefs.get().visible === false) return
 		if (options.force !== true && typeof document !== 'undefined' && !document.hidden && document.hasFocus?.() === true) return
+		this._stopHandoffMonitor()
 		this._starting = true
 		const token = ++this._startToken
 		try {
@@ -1023,6 +1121,7 @@ class ChatPetDesktopBridge {
 	async stop(options = {}) {
 		const returning = options.returning !== false
 		const dispose = options.dispose === true
+		this._stopHandoffMonitor()
 		this._startToken += 1
 		const session = this.session
 		const wasActive = this.active
@@ -1095,9 +1194,11 @@ class ChatPetDesktopBridge {
 			// Start immediately: a 250ms setTimeout in a hidden renderer can be
 			// throttled or frozen, which used to leave the handoff never started.
 			this._cancelScheduledStart()
+			this._stopHandoffMonitor()
 			this.start()
 		} else {
 			this._cancelScheduledStart()
+			this._stopHandoffMonitor()
 			if (this._starting) this._startToken += 1
 			if (this.active) this.stop({ returning: true })
 		}
@@ -1106,6 +1207,7 @@ class ChatPetDesktopBridge {
 	_onWindowFocus() {
 		if (this.disposed) return
 		this._cancelScheduledStart()
+		this._stopHandoffMonitor()
 		// A start that is still in flight must not hand off after DSH regained
 		// focus; invalidate it so its response is stopped instead of shown.
 		if (this._starting) this._startToken += 1
@@ -1114,16 +1216,17 @@ class ChatPetDesktopBridge {
 
 	_onWindowBlur() {
 		if (this.disposed || !this.enabled) return
-		// Same as visibilitychange: start in the event itself instead of a timer
+		// Same as visibilitychange: decide in the event itself instead of a timer
 		// that a background window may throttle.
 		this._cancelScheduledStart()
-		this.start()
+		this._requestHandoff()
 	}
 
 	_onPrefsChange() {
 		if (this.disposed || this._stopping) return
 		const prefs = this.prefs.get()
 		if (!prefs.desktopDisplay || prefs.visible === false) {
+			this._stopHandoffMonitor()
 			this._stopFactsTimer()
 			if (this.active) this.stop({ returning: true, dispose: true })
 			else this._disposePrepared()
@@ -1142,6 +1245,7 @@ class ChatPetDesktopBridge {
 		this.disposed = true
 		this._startToken += 1
 		this._cancelScheduledStart()
+		this._stopHandoffMonitor()
 		this._stopPolling()
 		this._stopFactsTimer()
 		try { document?.removeEventListener?.('visibilitychange', this._onVisibilityChange) } catch (ignored) { /* noop */ }
