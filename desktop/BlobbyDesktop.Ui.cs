@@ -934,14 +934,27 @@ namespace BlobbyDesktop
 			return IntPtr.Zero;
 		}
 
+		// The window must be the same size for every state: resizing a layered
+		// window recreates its surface and the DWM presents the previous content at
+		// the new origin for one frame, which is visible as a flash whenever a click
+		// switches to a state with a different sprite width (waking, buttonPress,
+		// typing, painting...). Size it once for the widest/tallest frame instead.
 		private void ComputePads()
 		{
-			DesktopAnimation animation = _currentAnimation ?? AnimationFor("idle");
-			double frameWidth = animation == null ? _displaySize : animation.Width / 2.0 * _settings.Scale;
-			double frameHeight = animation == null ? _displaySize : animation.Height / 2.0 * _settings.Scale;
+			double scale = Math.Max(0.0001, _settings.Scale);
+			double frameWidth = _displaySize;
+			double frameHeight = _displaySize;
+			if (_manifest != null && _manifest.States != null)
+			{
+				foreach (DesktopAnimation animation in _manifest.States.Values)
+				{
+					if (animation == null) continue;
+					frameWidth = Math.Max(frameWidth, animation.Width / 2.0 * scale);
+					frameHeight = Math.Max(frameHeight, animation.Height / 2.0 * scale);
+				}
+			}
 			double wideOverhang = Math.Max(0, frameWidth - _displaySize);
 			double tallOver = Math.Max(0, frameHeight - _displaySize);
-			double scale = Math.Max(0.0001, _settings.Scale);
 			_padX = wideOverhang + _displaySize * 0.5 + 8;
 			_padTop = Math.Max(32 * scale, tallOver) + _displaySize * 0.5 + 8;
 		}

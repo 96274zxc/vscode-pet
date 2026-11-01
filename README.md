@@ -196,6 +196,14 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   starts the waking animation (guarded against the nested call from `recompute()`'s busy-start path),
   so the official 8-frame `buddy-waking` sprite plays for 880ms and then returns to idle, matching
   the VS Code original. The desktop helper already handled this in its state machine.
+- 1.2.25 desktop click/wake flash fix: the helper sized its layered pet window from the *current*
+  animation's frame width, so every state change that switched to a wider sprite (waking/sleep 120,
+  buttonPress 160, typing 168, painting 192) resized the window. A layered-window resize recreates
+  its surface and the DWM presents the previous content (and an unpainted edge) for one frame — the
+  flash and the thin dark edge seen during the wake shake. The pads are now computed once from the
+  widest/tallest frame in the whole manifest, so the window keeps one size (208×112 at scale 1) for
+  every state and only moves with the pet; click-through and the taskbar-hugging bottom edge are
+  unchanged. This also removes the frame that was exposed when the pet returned to idle after waking.
 - The remaining helper footprint is the PowerShell 5.1 + .NET/WPF runtime itself; removing it would
   need a different helper host and is out of scope for the current implementation.
 
@@ -333,6 +341,12 @@ The 1.2.24 wake fix was exercised on the live pet in both placements. In the DSH
 capture of the pet confirmed the rendered sprite changed for the waking frames. With the desktop
 helper shown (DSH minimized) the helper's `status.json` sampled around the click shows the same
 `sleep` → `waking` → `idle` sequence, so both placements play the shake-then-wake animation.
+The 1.2.25 constant-size fix was verified by sampling the helper's `status.json` window rect across
+state changes: a sleeping pet clicked into `waking` and back to `idle` keeps `208×112` throughout
+(previously 136×112 → 112×112), and clicking an idle pet into the wide `cool` state also keeps
+`208×112`. The rendered `buddy-waking` frames were also compared pixel-by-pixel with the official
+`buddy-waking-*.spritesheet.png`: the geometry is identical (only the body colors differ), so the
+edge seen during the shake came from the window resize, not from the sprite art.
 The helper's geometry, physics and state-machine self-test runs in the test suite.
 
 
