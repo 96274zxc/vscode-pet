@@ -112,6 +112,12 @@ thinking 气泡。主图为 144×144（插件卡片 36px 的 4 倍），`icons/i
   host 只接受属于当前 show 的快照；helper 在显示/隐藏切换时立即落盘（不再等 250ms），并在写完状态
   后才回 `shown`；`/start` 也改为等待这个 `shown` 确认，helper 不确认时返回 504 并让客户端恢复窗口内
   宠物，而不是把两边都挂起。
+- 1.2.20 的 stdin 编码修复：helper 用控制台 ANSI 代码页（中文 Windows 上是 CP936）解码 stdin，
+  show 命令里的 UTF-8 菜单文案被错误解码——"跳跳乐" 的最后一个前导字节把后面的引号一起吃掉，整行
+  JSON 解析失败，helper 又静默丢弃该行，于是复用的 prepared helper 永远不显示；host 只看到 ack 超时
+  并杀掉 helper，下一次冷启动又能用，所以表现为"有时能传送、有时不行"。现在 host 把所有 stdin 消息
+  写成纯 ASCII（`\uXXXX` 转义，任何解码器都能还原原文），helper 也显式按 UTF-8 读取 stdin；无法解析
+  的命令会写到 stderr 而不是被静默丢弃。
 - helper 剩余的主要占用来自 PowerShell 5.1 + .NET/WPF 运行时本身；要移除它需要更换 helper 宿主，
   不在当前实现范围内。
 
@@ -215,6 +221,9 @@ VS Code 1.144 的 Blobby 逐帧对比了落下与重生轨迹。
 1.2.19 的传送修复也用真实 helper 重新验证：`shown` 确认时 `status.json` 已刷新（`showSeq` 匹配、
 phase 为 `starting`）、start 后立刻发生的 facts 心跳返回 `prepared: false`、DSH 最小化时 helper
 保持在任务栏上方 resting，以及 stop 后 helper 回到 prepared 且 facts 再次返回 `prepared: true`。
+
+1.2.20 的编码修复用带中文菜单文案的 bundle 验证：同一处原本 8 秒超时的复用 show 现在 3–6ms 就确认，
+真实 helper 连续 8 次最小化/恢复只复用一个 prepared 会话（`showSeq` 从 1 到 6），没有再出现冷启动。
 
 `docs/states.png` 是状态矩阵，`docs/hats.png` 与 `docs/color.png` 是自定义面板截图。
 

@@ -289,6 +289,47 @@ test('facts heartbeat reports the helper prepared state for the active clear', a
 	}
 })
 
+test('non-ASCII labels are written to the helper as pure ASCII JSON escapes', async () => {
+	const { manager, tempRoot, spawn } = await makeManager()
+	try {
+		const chinese = {
+			'menu.hats': '帽子',
+			'menu.playJump': '跳跳乐',
+			'menu.goOnTheRun': '跑路',
+			'menu.comeBack': '回来',
+			'menu.grow': '变大',
+			'menu.shrink': '缩小',
+			'menu.resetSize': '恢复大小',
+			'menu.changeColor': '颜色',
+			'menu.desktopDisplay': '桌面显示',
+			'menu.smartHide': '智能隐藏',
+		}
+		const bundle = makeBundle({
+			facts: { running: false, labels: chinese },
+			labels: { ...makeBundle().labels, ...chinese },
+		})
+		const prepared = await manager.prepare(bundle)
+		const started = await manager.start(bundle)
+		assert.equal(started.session, prepared.session)
+		const child = spawn.spawned[0].child
+		const showLine = child.stdinLines.find(line => line.includes('"show"'))
+		assert.ok(showLine, 'the show command was written')
+		assert.equal(/^[\x20-\x7e]*$/.test(showLine.trim()), true, 'the show command is pure ASCII on the pipe')
+		const show = JSON.parse(showLine)
+		assert.equal(show.facts.labels['menu.hats'], '帽子')
+		assert.equal(show.facts.labels['menu.playJump'], '跳跳乐')
+		assert.equal(show.facts.labels['menu.smartHide'], '智能隐藏')
+		await manager.facts(started.session, { running: false })
+		const factsLine = child.stdinLines.find(line => line.includes('"facts"'))
+		assert.ok(factsLine, 'the facts heartbeat was written')
+		assert.equal(/^[\x20-\x7e]*$/.test(factsLine.trim()), true, 'the facts heartbeat is pure ASCII on the pipe')
+		await manager.stop(started.session, { dispose: true })
+	} finally {
+		manager.dispose()
+		await rm(tempRoot, { recursive: true, force: true })
+	}
+})
+
 test('the prepared snapshot of the previous window is not reported after a show', async () => {
 	const tempRoot = await mkdtemp(path.join(tmpdir(), 'blobby-host-test-'))
 	const spawn = fakeSpawn({ status: true })

@@ -141,6 +141,15 @@ Thanks to the VS Code team and the original Blobby authors for the character and
   acknowledges with `shown`, and `/start` waits for that acknowledgement: a helper that never
   confirms fails the start with `504` (the client then restores the in-window pet) instead of
   suspending both halves.
+- 1.2.20 stdin-encoding fix: the helper decoded its stdin with the console's ANSI code page (CP936
+  on Chinese Windows), so the UTF-8 menu labels inside a show command were mangled — the label
+  "跳跳乐" ended in a lead byte that swallowed the closing quote and the whole line failed to
+  parse. The helper silently dropped it, so a reused (prepared) helper never showed: the host only
+  saw the missing acknowledgement, killed the helper after the timeout, and the next cold start
+  worked again — which is why the handoff looked intermittent. The host now writes every stdin
+  message as pure ASCII (`\uXXXX` escapes, decoded back to the original text by any reader) and the
+  helper reads stdin as UTF-8 explicitly; an unparsable command is reported on stderr instead of
+  being dropped silently.
 - The remaining helper footprint is the PowerShell 5.1 + .NET/WPF runtime itself; removing it would
   need a different helper host and is out of scope for the current implementation.
 
@@ -254,6 +263,9 @@ The 1.2.19 handoff fix was re-checked against the real helper: the `shown` ackno
 fresh `status.json` (`showSeq` matching, phase `starting`), `/facts` right after the start reporting
 `prepared: false` while the helper rested above the taskbar with DSH minimized, and the stop returning
 the helper to a prepared phase that `/facts` reports as `prepared: true` again.
+The 1.2.20 encoding fix was verified with a bundle carrying the Chinese menu labels: the same reuse
+show that had timed out after 8 s now acknowledges in 3–6 ms, and eight consecutive minimize/restore
+cycles on the real helper reused one prepared session (`showSeq` 1…6) without a single cold respawn.
 The helper's geometry, physics and state-machine self-test runs in the test suite.
 
 

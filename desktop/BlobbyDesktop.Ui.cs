@@ -359,8 +359,12 @@ namespace BlobbyDesktop
 				{
 					try
 					{
+						// Read the protocol as UTF-8 explicitly. Console.In decodes with the
+						// console's ANSI code page, which mangled non-ASCII labels into
+						// invalid JSON and silently dropped a whole show command.
+						StreamReader input = new StreamReader(Console.OpenStandardInput(), new UTF8Encoding(false), false);
 						string line;
-						while ((line = Console.In.ReadLine()) != null)
+						while ((line = input.ReadLine()) != null)
 						{
 							if (string.IsNullOrWhiteSpace(line)) continue;
 							Dictionary<string, object> message;
@@ -370,6 +374,14 @@ namespace BlobbyDesktop
 							}
 							catch (Exception)
 							{
+								try
+								{
+									string preview = line.Length > 200 ? line.Substring(0, 200) : line;
+									Console.Error.WriteLine("blobby-desktop: ignored an unparsable command: " + preview);
+								}
+								catch (Exception)
+								{
+								}
 								continue;
 							}
 							Dispatcher dispatcher = window.UiDispatcher;

@@ -64,6 +64,17 @@ function appendStderr(session, chunk) {
 	session.stderr = `${session.stderr}${String(chunk)}`.slice(-MAX_STDERR)
 }
 
+function encodeStdinMessage(value) {
+	// Keep every byte on the helper's stdin inside ASCII. The helper's stdin used
+	// to be decoded with the console's ANSI code page, so the UTF-8 menu labels in
+	// a show command were mangled into invalid JSON (a trailing lead byte swallowed
+	// the closing quote of a Chinese label); the helper silently dropped the line,
+	// the show was never acknowledged and the pet never appeared. \uXXXX escapes
+	// survive any decoder and JSON.parse / JavaScriptSerializer restore the text.
+	return JSON.stringify(value).replace(/[\u007f-\uffff]/g, character =>
+		`\\u${character.charCodeAt(0).toString(16).padStart(4, '0')}`)
+}
+
 export class DesktopHelperManager {
 	constructor(options = {}) {
 		this.platform = options.platform ?? process.platform
@@ -542,7 +553,7 @@ export class DesktopHelperManager {
 	_writeStdin(session, value) {
 		try {
 			if (session.child?.stdin?.writable) {
-				session.child.stdin.write(`${JSON.stringify(value)}\n`)
+				session.child.stdin.write(`${encodeStdinMessage(value)}\n`)
 				return true
 			}
 		} catch (ignored) { /* the exit handler reports the failure */ }
